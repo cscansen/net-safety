@@ -34,6 +34,7 @@ def init_db():
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 domain              TEXT UNIQUE NOT NULL,
                 daily_limit_minutes INTEGER DEFAULT 30,
+                approved_by         TEXT,
                 approved_at         DATETIME DEFAULT (datetime('now'))
             );
 
@@ -48,6 +49,13 @@ def init_db():
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS admins (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                username     TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at   DATETIME DEFAULT (datetime('now'))
             );
 
             CREATE INDEX IF NOT EXISTS idx_blocked_domain ON blocked_log(domain);
@@ -108,6 +116,8 @@ def get_review_data():
                 MAX(bl.attempted_at)                       AS last_attempted,
                 w.domain IS NOT NULL                       AS is_approved,
                 w.daily_limit_minutes,
+                w.approved_by,
+                w.approved_at,
                 COALESCE(SUM(sl.duration_seconds), 0) / 60.0 AS minutes_used_today
             FROM blocked_log bl
             LEFT JOIN whitelist w ON w.domain = bl.domain
@@ -116,6 +126,73 @@ def get_review_data():
             GROUP BY bl.domain
             ORDER BY last_attempted DESC
         """, (today,)).fetchall()
+
+
+ADMIN_HASH_FILE = "/etc/kid-proxy/admin.hash"
+
+
+def migrate_legacy_admin():
+    """Import admin.hash into admins table as 'admin' if table is empty."""
+    with get_conn() as conn:
+        count = conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
+        if count > 0:
+            return
+    import os
+    if not os.path.exists(ADMIN_HASH_FILE):
+        return
+    try:
+        pw_hash = open(ADMIN_HASH_FILE, "rb").read().strip().decode()
+        with get_conn() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO admins (username, password_hash) VALUES ('admin', ?)",
+                (pw_hash,),
+            )
+    except Exception:
+        pass
+
+
+def list_admins():
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT id, username, created_at FROM admins ORDER BY id"
+        ).fetchall()
+
+
+def add_admin(username, pw_hash):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO admins (username, password_hash) VALUES (?, ?)",
+            (username, pw_hash),
+        )
+
+
+def update_admin_password(username, pw_hash):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE admins SET password_hash = ? WHERE username = ?",
+            (pw_hash, username),
+        )
+
+
+def delete_admin(username):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM admins WHERE username = ?", (username,))
+
+
+def admin_count():
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
+
+
+def check_admin_password(username, password):
+    import bcrypt
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT password_hash FROM admins WHERE username = ?", (username,)
+        ).fetchone()
+    if row is None:
+        return False
+    return bcrypt.checkpw(password.encode(), row["password_hash"].encode())
 
 
 def get_bypass_until():
@@ -153,7 +230,7 @@ def set_bypass(until_ts):
             )
 
 
-def apply_parent_review(approved_domains_limits):
+def apply_parent_review(approved_domains_limits, approved_by=None):
     """
     approved_domains_limits: {domain: limit_minutes | None}
     Domains in blocked_log not present here get removed from whitelist.
@@ -170,7 +247,10 @@ def apply_parent_review(approved_domains_limits):
         # Upsert approved domains
         for domain, limit in approved_domains_limits.items():
             conn.execute("""
-                INSERT INTO whitelist (domain, daily_limit_minutes)
-                VALUES (?, ?)
-                ON CONFLICT(domain) DO UPDATE SET daily_limit_minutes = excluded.daily_limit_minutes
-            """, (domain, limit))
+                INSERT INTO whitelist (domain, daily_limit_minutes, approved_by, approved_at)
+                VALUES (?, ?, ?, datetime('now'))
+                ON CONFLICT(domain) DO UPDATE SET
+                    daily_limit_minutes = excluded.daily_limit_minutes,
+                    approved_by         = excluded.approved_by,
+                    approved_at         = excluded.approved_at
+            """, (domain, limit, approved_by))

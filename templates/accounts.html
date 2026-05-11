@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Accounts</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f0f4ff;
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+    color: #1a1a2e;
+  }
+  .header {
+    max-width: 640px;
+    margin: 0 auto 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 { font-size: 22px; }
+  .header .right { display: flex; gap: 12px; align-items: center; }
+  .btn-back {
+    color: #777; font-size: 14px; text-decoration: none;
+    padding: 6px 14px; border: 1px solid #ddd;
+    border-radius: 8px; background: #fff;
+  }
+  .btn-back:hover { border-color: #aaa; }
+
+  .card {
+    max-width: 640px;
+    margin: 0 auto 24px;
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 32px rgba(0,0,0,.07);
+    overflow: hidden;
+  }
+  .card-title {
+    padding: 16px 20px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #666;
+    border-bottom: 1px solid #eee;
+    background: #f8f9ff;
+  }
+
+  /* ── account rows ── */
+  .account-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f0f0f0;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .account-row:last-child { border-bottom: none; }
+  .account-name { font-weight: 600; font-size: 15px; }
+  .account-meta { font-size: 12px; color: #999; margin-top: 2px; }
+  .account-you  { font-size: 12px; color: #1a73e8; font-weight: 600; margin-left: 8px; }
+  .row-actions { display: flex; gap: 8px; }
+
+  /* ── forms ── */
+  .form-section { padding: 20px; }
+  .form-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .form-row input {
+    flex: 1;
+    min-width: 140px;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .form-row input:focus { border-color: #1a73e8; }
+  .btn-add {
+    background: #1a73e8; color: #fff; border: none;
+    padding: 10px 22px; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-add:hover { background: #155db2; }
+  .btn-delete {
+    background: #fff; color: #e53935; border: 1px solid #e53935;
+    padding: 6px 14px; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer;
+  }
+  .btn-delete:hover { background: #fde8e8; }
+  .btn-change {
+    background: #fff; color: #555; border: 1px solid #ddd;
+    padding: 6px 14px; border-radius: 8px; font-size: 13px;
+    cursor: pointer;
+  }
+  .btn-change:hover { border-color: #aaa; }
+
+  /* ── change password drawer ── */
+  .pw-drawer {
+    display: none;
+    background: #f8f9ff;
+    border-top: 1px solid #eee;
+    padding: 16px 20px;
+  }
+  .pw-drawer.open { display: block; }
+  .pw-drawer .form-row { margin-bottom: 8px; }
+  .pw-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #444; }
+
+  .alert {
+    max-width: 640px;
+    margin: 0 auto 16px;
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .alert-error   { background: #fde8e8; color: #c0392b; }
+  .alert-success { background: #e6f4ea; color: #1e8e3e; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Admin Accounts</h1>
+  <div class="right">
+    <span style="font-size:13px;color:#888">Signed in as <strong>{{ current_user }}</strong></span>
+    <a href="/review" class="btn-back">← Back</a>
+  </div>
+</div>
+
+{% if add_error %}
+<div class="alert alert-error">{{ add_error }}</div>
+{% endif %}
+{% if del_error %}
+<div class="alert alert-error">{{ del_error }}</div>
+{% endif %}
+{% if pw_error %}
+<div class="alert alert-error">{{ pw_error }}</div>
+{% endif %}
+{% if pw_changed %}
+<div class="alert alert-success">Password updated for {{ pw_username }}.</div>
+{% endif %}
+
+<!-- Current accounts -->
+<div class="card">
+  <div class="card-title">Current Accounts</div>
+  {% for a in admins %}
+  <div class="account-row">
+    <div>
+      <div class="account-name">
+        {{ a.username }}
+        {% if a.username == current_user %}
+        <span class="account-you">you</span>
+        {% endif %}
+      </div>
+      <div class="account-meta">Added {{ a.created_at[:10] if a.created_at else '—' }}</div>
+    </div>
+    <div class="row-actions">
+      <button class="btn-change" type="button"
+              onclick="toggleDrawer('drawer_{{ loop.index }}')">Change password</button>
+      {% if a.username != current_user %}
+      <form method="post" action="/accounts/delete"
+            onsubmit="return confirm('Delete {{ a.username }}?')">
+        <input type="hidden" name="username" value="{{ a.username }}">
+        <button type="submit" class="btn-delete">Delete</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="pw-drawer {% if pw_error and pw_username == a.username %}open{% endif %}"
+       id="drawer_{{ loop.index }}">
+    <div class="pw-title">Change password for {{ a.username }}</div>
+    <form method="post" action="/accounts/change-password">
+      <input type="hidden" name="username" value="{{ a.username }}">
+      <div class="form-row">
+        <input type="password" name="current_password" placeholder="Current password"
+               autocomplete="current-password">
+        <input type="password" name="new_password" placeholder="New password"
+               autocomplete="new-password">
+        <button type="submit" class="btn-add">Save</button>
+      </div>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Add account -->
+<div class="card">
+  <div class="card-title">Add Account</div>
+  <div class="form-section">
+    <form method="post" action="/accounts/add" autocomplete="off">
+      <div class="form-row">
+        <input type="text" name="username" placeholder="Username"
+               autocomplete="off" spellcheck="false">
+        <input type="password" name="password" placeholder="Password"
+               autocomplete="new-password">
+        <button type="submit" class="btn-add">Add</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function toggleDrawer(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+</script>
+</body>
+</html>

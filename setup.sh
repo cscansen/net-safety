@@ -107,20 +107,30 @@ chmod 750 /opt/kid-proxy /var/lib/kid-proxy
 info "Initialising SQLite database..."
 sudo -u kidproxy /opt/kid-proxy/venv/bin/python -c "import sys; sys.path.insert(0,'/opt/kid-proxy'); import db; db.init_db()"
 
-# ── 7. admin password ────────────────────────────────────────────────────────
+# ── 7. admin account ─────────────────────────────────────────────────────────
 echo ""
+read -rp "  Admin username [admin]: " ADMIN_USER
+ADMIN_USER="${ADMIN_USER:-admin}"
 while true; do
-  read -rsp "  Set admin password: " PW1; echo
-  read -rsp "  Confirm password:   " PW2; echo
-  [[ "$PW1" == "$PW2" ]] && break
+  read -rsp "  Set password for '$ADMIN_USER': " PW1; echo
+  [[ -n "$PW1" ]] && break
+  warn "Admin password cannot be empty."
+done
+read -rsp "  Confirm password: " PW2; echo
+while [[ "$PW1" != "$PW2" ]]; do
   warn "Passwords don't match, try again."
+  read -rsp "  Set password for '$ADMIN_USER': " PW1; echo
+  read -rsp "  Confirm password:               " PW2; echo
 done
 
 /opt/kid-proxy/venv/bin/python -c "
-import bcrypt, sys
-h = bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode()
-print(h)
-" "$PW1" > /etc/kid-proxy/admin.hash
+import sys; sys.path.insert(0,'/opt/kid-proxy')
+import db, bcrypt
+db.init_db()
+h = bcrypt.hashpw(sys.argv[2].encode(), bcrypt.gensalt()).decode()
+db.add_admin(sys.argv[1], h)
+" "$ADMIN_USER" "$PW1"
+info "Admin account '$ADMIN_USER' created."
 
 # ── 8. flask secret ──────────────────────────────────────────────────────────
 FLASK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")

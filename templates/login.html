@@ -27,7 +27,7 @@
   .icon { font-size: 56px; margin-bottom: 12px; }
   h1 { font-size: 22px; color: #1a1a2e; margin-bottom: 6px; }
   .sub { color: #777; font-size: 14px; margin-bottom: 28px; }
-  input[type=password] {
+  input[type=text], input[type=password] {
     width: 100%;
     padding: 12px 16px;
     border: 2px solid #e0e0e0;
@@ -37,7 +37,7 @@
     transition: border-color .2s;
     margin-bottom: 16px;
   }
-  input[type=password]:focus { border-color: #1a73e8; }
+  input[type=text]:focus, input[type=password]:focus { border-color: #1a73e8; }
   button {
     width: 100%;
     padding: 13px;
@@ -65,13 +65,15 @@
 <div class="card">
   <div class="icon">🔒</div>
   <h1>Parent Review</h1>
-  <p class="sub">Enter your password to review and approve sites</p>
+  <p class="sub">Sign in to review and approve sites</p>
   <form method="post" action="/login" autocomplete="off">
     {% if error %}
-    <div class="error">Incorrect password. Try again.</div>
+    <div class="error">Incorrect username or password.</div>
     {% endif %}
-    <input type="password" name="password" placeholder="Parent password"
-           autofocus autocomplete="current-password">
+    <input type="text" name="username" placeholder="Username"
+           autofocus autocomplete="username">
+    <input type="password" name="password" placeholder="Password"
+           autocomplete="current-password">
     <button type="submit">Unlock</button>
   </form>
 </div>

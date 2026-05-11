@@ -21,19 +21,9 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Strict"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=2)
 
-ADMIN_HASH_FILE = "/etc/kid-proxy/admin.hash"
-
-
-def _check_password(pw: str) -> bool:
-    try:
-        stored = Path(ADMIN_HASH_FILE).read_bytes().strip()
-        return bcrypt.checkpw(pw.encode(), stored)
-    except Exception:
-        return False
-
 
 def _require_auth():
-    if not session.get("authenticated"):
+    if not session.get("admin_username"):
         return redirect(url_for("login"))
 
 
@@ -54,22 +44,30 @@ def _fmt_age(ts: str | None) -> str:
         return ts
 
 
+def _hash_password(pw: str) -> str:
+    return bcrypt.hashpw(pw.encode(), bcrypt.gensalt()).decode()
+
+
 # ── routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def index():
-    if not session.get("authenticated"):
+    if not session.get("admin_username"):
         return redirect(url_for("login"))
     return redirect(url_for("review"))
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # Run migration once on first login attempt
+    db.migrate_legacy_admin()
     error = False
     if request.method == "POST":
-        if _check_password(request.form.get("password", "")):
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        if username and db.check_admin_password(username, password):
             session.permanent = True
-            session["authenticated"] = True
+            session["admin_username"] = username
             return redirect(url_for("review"))
         error = True
     return render_template("login.html", error=error)
@@ -97,6 +95,8 @@ def review():
             "approved":      bool(r["is_approved"]),
             "limit_minutes": r["daily_limit_minutes"],
             "used_minutes":  round(r["minutes_used_today"], 1),
+            "approved_by":   r["approved_by"] or "—",
+            "approved_at":   _fmt_age(r["approved_at"]),
         })
 
     bypass_until = db.get_bypass_until()
@@ -113,7 +113,32 @@ def review():
 
     return render_template("review.html", domains=domains,
                            bypass_active=bypass_active,
-                           bypass_remaining=bypass_remaining)
+                           bypass_remaining=bypass_remaining,
+                           current_user=session["admin_username"])
+
+
+@app.post("/apply")
+def apply():
+    redir = _require_auth()
+    if redir:
+        return redir
+
+    approved: dict[str, int | None] = {}
+    form = request.form
+
+    for key in form:
+        if not key.startswith("allow_"):
+            continue
+        domain = key[len("allow_"):]
+        raw_limit = form.get(f"limit_{domain}", "").strip()
+        try:
+            limit = max(1, int(raw_limit))
+        except (ValueError, TypeError):
+            limit = db.DEFAULT_LIMIT_MINUTES
+        approved[domain] = limit
+
+    db.apply_parent_review(approved, approved_by=session["admin_username"])
+    return redirect(url_for("review"))
 
 
 @app.post("/bypass")
@@ -135,33 +160,91 @@ def bypass():
     return redirect(url_for("review"))
 
 
-@app.post("/apply")
-def apply():
+# ── account management ────────────────────────────────────────────────────────
+
+@app.get("/accounts")
+def accounts():
     redir = _require_auth()
     if redir:
         return redir
+    admins = [dict(r) for r in db.list_admins()]
+    return render_template("accounts.html",
+                           admins=admins,
+                           current_user=session["admin_username"])
 
-    # Build {domain: limit_minutes | None} for every checked domain
-    approved: dict[str, int | None] = {}
-    form = request.form
 
-    for key in form:
-        if not key.startswith("allow_"):
-            continue
-        domain = key[len("allow_"):]
-        raw_limit = form.get(f"limit_{domain}", "").strip()
+@app.post("/accounts/add")
+def accounts_add():
+    redir = _require_auth()
+    if redir:
+        return redir
+    username = request.form.get("username", "").strip().lower()
+    password = request.form.get("password", "")
+    error = None
+    if not username:
+        error = "Username is required."
+    elif not password:
+        error = "Password is required."
+    else:
         try:
-            limit = max(1, int(raw_limit))
-        except (ValueError, TypeError):
-            limit = db.DEFAULT_LIMIT_MINUTES
-        approved[domain] = limit
+            db.add_admin(username, _hash_password(password))
+        except Exception:
+            error = f"Username '{username}' already exists."
+    if error:
+        admins = [dict(r) for r in db.list_admins()]
+        return render_template("accounts.html", admins=admins,
+                               current_user=session["admin_username"],
+                               add_error=error)
+    return redirect(url_for("accounts"))
 
-    db.apply_parent_review(approved)
-    return redirect(url_for("review"))
+
+@app.post("/accounts/change-password")
+def accounts_change_password():
+    redir = _require_auth()
+    if redir:
+        return redir
+    username = request.form.get("username", "").strip()
+    current_pw = request.form.get("current_password", "")
+    new_pw = request.form.get("new_password", "")
+    error = None
+    if not db.check_admin_password(username, current_pw):
+        error = "Current password is incorrect."
+    elif len(new_pw) < 1:
+        error = "New password cannot be empty."
+    else:
+        db.update_admin_password(username, _hash_password(new_pw))
+    admins = [dict(r) for r in db.list_admins()]
+    return render_template("accounts.html", admins=admins,
+                           current_user=session["admin_username"],
+                           pw_error=error,
+                           pw_changed=(error is None),
+                           pw_username=username)
+
+
+@app.post("/accounts/delete")
+def accounts_delete():
+    redir = _require_auth()
+    if redir:
+        return redir
+    username = request.form.get("username", "").strip()
+    error = None
+    if username == session["admin_username"]:
+        error = "You cannot delete your own account."
+    elif db.admin_count() <= 1:
+        error = "Cannot delete the last admin account."
+    else:
+        db.delete_admin(username)
+    if error:
+        admins = [dict(r) for r in db.list_admins()]
+        return render_template("accounts.html", admins=admins,
+                               current_user=session["admin_username"],
+                               del_error=error)
+    return redirect(url_for("accounts"))
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     db.init_db()
+    db.migrate_legacy_admin()
     app.run(host="127.0.0.1", port=9090, debug=False)

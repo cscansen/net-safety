@@ -202,7 +202,8 @@
 <div class="header">
   <h1>🔒 Parent Review</h1>
   <div class="right">
-    <span style="font-size:13px;color:#888">Check sites to allow. Uncheck to block.</span>
+    <span style="font-size:13px;color:#888">Signed in as <strong>{{ current_user }}</strong></span>
+    <a href="/accounts" class="btn-logout">Accounts</a>
     <a href="/logout" class="btn-logout">Log out</a>
   </div>
 </div>
@@ -216,6 +217,7 @@
           <th>Site</th>
           <th style="text-align:center">Visits</th>
           <th>Last Seen</th>
+          <th>Approved By</th>
           <th style="text-align:center">Allow?</th>
           <th>Daily Limit</th>
         </tr>
@@ -238,6 +240,14 @@
 
           <!-- Last seen -->
           <td style="color:#777; font-size:14px;">{{ d.last_seen }}</td>
+
+          <!-- Approved by -->
+          <td style="font-size:13px;color:#777;">
+            {% if d.approved %}
+              {{ d.approved_by }}<br>
+              <span style="font-size:11px;color:#bbb">{{ d.approved_at }}</span>
+            {% else %}—{% endif %}
+          </td>
 
           <!-- Checkbox -->
           <td class="check-cell">
