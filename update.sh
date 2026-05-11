@@ -6,7 +6,6 @@ set -euo pipefail
 REPO_DIR="/opt/net-safety-src"
 DEPLOY_DIR="/opt/kid-proxy"
 LOG="/var/log/kid-proxy-update.log"
-GIT_SSH="ssh -i /etc/kid-proxy/deploy_key -o StrictHostKeyChecking=no"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG"; }
 
@@ -16,7 +15,7 @@ if [ ! -d "$REPO_DIR/.git" ]; then
 fi
 
 cd "$REPO_DIR"
-GIT_SSH_COMMAND="$GIT_SSH" git fetch origin main --quiet
+git fetch origin main --quiet
 
 LOCAL=$(git rev-parse HEAD)
 REMOTE=$(git rev-parse origin/main)
@@ -26,7 +25,7 @@ if [ "$LOCAL" = "$REMOTE" ]; then
 fi
 
 log "Update detected: $LOCAL -> $REMOTE"
-GIT_SSH_COMMAND="$GIT_SSH" git pull origin main --quiet
+git pull origin main --quiet
 
 rsync -a --delete \
     --exclude='.git' \

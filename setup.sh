@@ -138,35 +138,15 @@ cp "$SCRIPT_DIR/kid-update.timer"   /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now kid-proxy kid-admin
 
-# ── 12. auto-update deploy key ───────────────────────────────────────────────
-info "Setting up auto-update deploy key..."
-DEPLOY_KEY=/etc/kid-proxy/deploy_key
-if [ ! -f "$DEPLOY_KEY" ]; then
-  ssh-keygen -t ed25519 -f "$DEPLOY_KEY" -N "" -C "net-safety-deploy@$(hostname)" -q
-fi
-chmod 600 "$DEPLOY_KEY"
-chmod 644 "${DEPLOY_KEY}.pub"
-
-echo ""
-echo "══════════════════════════════════════════"
-echo "  Add this deploy key to the net-safety GitHub repo"
-echo "  (Settings → Deploy keys → Add key — read-only)"
-echo ""
-cat "${DEPLOY_KEY}.pub"
-echo "══════════════════════════════════════════"
-echo ""
-read -rp "  Press Enter once the deploy key has been added to GitHub..."
-
-# ── 13. clone repo for auto-update ──────────────────────────────────────────
+# ── 12. clone repo for auto-update ──────────────────────────────────────────
 REPO_DIR=/opt/net-safety-src
-REPO_URL="git@github.com:cscansen/net-safety.git"
-GIT_SSH="ssh -i $DEPLOY_KEY -o StrictHostKeyChecking=no"
+REPO_URL="https://github.com/cscansen/net-safety.git"
 
 info "Cloning net-safety repo to $REPO_DIR..."
 if [ -d "$REPO_DIR/.git" ]; then
   info "Repo already cloned, skipping."
 else
-  GIT_SSH_COMMAND="$GIT_SSH" git clone "$REPO_URL" "$REPO_DIR"
+  git clone "$REPO_URL" "$REPO_DIR"
 fi
 
 # Install update script and enable timer
