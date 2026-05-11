@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
 <title>Admin Accounts</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     background: #f0f4ff;
     min-height: 100vh;
     padding: 24px 16px 48px;
@@ -120,6 +121,29 @@
   }
   .alert-error   { background: #fde8e8; color: #c0392b; }
   .alert-success { background: #e6f4ea; color: #1e8e3e; }
+
+  @media (prefers-color-scheme: dark) {
+    body       { background: #0f1117; color: #e8eaf6; }
+    .card      { background: #1a1d2e; box-shadow: 0 4px 32px rgba(0,0,0,.4); }
+    .card-title { background: #222538; color: #9e9eb0; border-color: #2a2d3e; }
+    .account-row { border-color: #2a2d3e; }
+    .account-meta { color: #9e9eb0; }
+    .btn-back  { background: #1a1d2e; border-color: #3a3d52; color: #9e9eb0; }
+    .btn-back:hover { border-color: #6a6d82; }
+    .form-row input {
+      background: #0f1117; border-color: #3a3d52; color: #e8eaf6;
+    }
+    .form-row input:focus { border-color: #4a8de8; }
+    .btn-change { background: #1a1d2e; border-color: #3a3d52; color: #c0c2d0; }
+    .btn-change:hover { border-color: #6a6d82; }
+    .btn-delete { background: #1a1d2e; border-color: #8b3535; color: #e57373; }
+    .btn-delete:hover { background: #2a1515; }
+    .pw-drawer  { background: #222538; border-color: #2a2d3e; }
+    .pw-title   { color: #c0c2d0; }
+    .alert-error   { background: #2a1515; color: #e57373; }
+    .alert-success { background: #152a1e; color: #4caf75; }
+    span[style*="color:#888"] { color: #9e9eb0 !important; }
+  }
 </style>
 </head>
 <body>

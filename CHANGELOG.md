@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0] - 2026-05-11
+
+### Changed
+- **Dark mode** — all three pages (login, review, accounts) now switch to a dark colour scheme automatically when the OS/browser is in dark mode (`prefers-color-scheme: dark`). No toggle needed; works on phones, tablets, and desktop.
+- **Font** — switched to Nunito (Google Fonts) with system-ui fallback. Rounded, friendly feel across all devices.
+
+---
+
 ## [0.6.0] - 2026-05-11
 
 ### Added
