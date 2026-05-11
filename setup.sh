@@ -19,6 +19,7 @@ echo "  Kid account setup"
 echo "══════════════════════════════════════════"
 read -rp "  Kid's username [buddy]: " KID_USER
 KID_USER="${KID_USER:-buddy}"
+KID_USER="${KID_USER,,}"   # force lowercase
 
 if id "$KID_USER" &>/dev/null; then
   warn "User '$KID_USER' already exists."
