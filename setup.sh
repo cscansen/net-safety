@@ -33,14 +33,36 @@ if id "$KID_USER" &>/dev/null; then
 else
   info "Creating standard user '$KID_USER'..."
   adduser --disabled-password --gecos "" "$KID_USER"
-  while true; do
-    read -rsp "  Set password for '$KID_USER': " KP1; echo
-    read -rsp "  Confirm password:              " KP2; echo
-    [[ "$KP1" == "$KP2" ]] && break
-    warn "Passwords don't match, try again."
-  done
-  echo "$KID_USER:$KP1" | chpasswd
-  info "User '$KID_USER' created."
+  read -rsp "  Set password for '$KID_USER' (Enter for passwordless): " KP1; echo
+  if [ -z "$KP1" ]; then
+    passwd -d "$KID_USER"
+    info "User '$KID_USER' created with no password."
+  else
+    read -rsp "  Confirm password: " KP2; echo
+    while [[ "$KP1" != "$KP2" ]]; do
+      warn "Passwords don't match, try again."
+      read -rsp "  Set password for '$KID_USER': " KP1; echo
+      read -rsp "  Confirm password:              " KP2; echo
+    done
+    echo "$KID_USER:$KP1" | chpasswd
+    info "User '$KID_USER' created."
+  fi
+
+  # Offer auto-login via LightDM
+  read -rp "  Enable auto-login as '$KID_USER' at boot? [Y/n]: " AUTO_LOGIN
+  if [[ "${AUTO_LOGIN,,}" != "n" ]]; then
+    LIGHTDM_CONF=/etc/lightdm/lightdm.conf
+    if [ -f "$LIGHTDM_CONF" ]; then
+      # Update existing autologin lines if present, else append
+      grep -q "^autologin-user=" "$LIGHTDM_CONF" \
+        && sed -i "s/^autologin-user=.*/autologin-user=$KID_USER/" "$LIGHTDM_CONF" \
+        || sed -i "/^\[Seat:\*\]/a autologin-user=$KID_USER\nautologin-user-timeout=0" "$LIGHTDM_CONF"
+    else
+      mkdir -p /etc/lightdm
+      printf '[Seat:*]\nautologin-user=%s\nautologin-user-timeout=0\n' "$KID_USER" > "$LIGHTDM_CONF"
+    fi
+    info "Auto-login enabled for '$KID_USER'."
+  fi
 fi
 
 # Persist username for Timekpr and future reference
