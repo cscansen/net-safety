@@ -4,7 +4,7 @@
 
 ### Fixed
 - **Firefox cert warnings** — added `Certificates.Install` to the Firefox enterprise policy so the mitmproxy CA cert is explicitly trusted. `ImportEnterpriseRoots` alone doesn't reliably pick up the system trust store on Linux.
-- **Review queue noise** — only top-level navigations (e.g. typing `google.com`) now appear in the approval queue. Sub-resources (images, scripts, fonts, XHR) loaded by the blocked page are silently dropped instead of flooding the list.
+- **Review queue noise** — sub-resources (images, scripts, fonts, XHR) from blocked pages are silently dropped instead of flooding the approval queue. Sub-resources from already-approved pages that are themselves blocked still appear for review so the parent can approve what's needed to fix broken pages.
 
 ---
 

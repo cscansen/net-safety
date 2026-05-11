@@ -232,12 +232,23 @@ class KidFilter:
 
         matched = _base_domain(host)
         if matched is None:
-            # Only queue for review on top-level navigations, not sub-resources
-            # (images, scripts, fonts, XHR) that load as part of the blocked page.
-            # Sec-Fetch-Mode is absent on non-browser requests — treat those as navigate.
             mode = flow.request.headers.get("sec-fetch-mode", "navigate")
             if mode == "navigate":
+                # Top-level navigation: always queue for review.
                 db.log_blocked(host, flow.request.pretty_url)
+            else:
+                # Sub-resource: only queue if the referring page is already approved.
+                # Sub-resources from blocked pages don't need review (the page is blocked
+                # anyway); sub-resources from approved pages do (they can break the page).
+                referer = flow.request.headers.get("referer", "")
+                if referer:
+                    try:
+                        from urllib.parse import urlparse
+                        ref_host = urlparse(referer).hostname or ""
+                        if _base_domain(ref_host) is not None:
+                            db.log_blocked(host, flow.request.pretty_url)
+                    except Exception:
+                        pass
             flow.response = _make_response(BLOCKED_TMPL, host)
             return
 
