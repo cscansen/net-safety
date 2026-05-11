@@ -3,8 +3,8 @@ Description=net-safety auto-update timer
 Requires=network-online.target
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=15min
+OnCalendar=weekly
+OnBootSec=5min
 Persistent=true
 
 [Install]
