@@ -74,7 +74,15 @@ info "Kid username '$KID_USER' saved to /etc/kid-proxy/kid-user"
 # ── 2. dependencies ──────────────────────────────────────────────────────────
 info "Installing system dependencies..."
 apt-get update -qq
-apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync avahi-daemon chromium-browser
+apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync avahi-daemon
+
+# Google Chrome — proper .deb (chromium-browser is a snap stub on Mint/Ubuntu 22.04+)
+if ! command -v google-chrome-stable &>/dev/null; then
+  info "Installing Google Chrome..."
+  wget -qO /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+  apt-get install -y /tmp/google-chrome.deb
+  rm -f /tmp/google-chrome.deb
+fi
 
 info "Creating Python venv and installing packages..."
 python3 -m venv /opt/kid-proxy/venv
@@ -160,8 +168,8 @@ info "Installing CA cert into system trust store..."
 cp "$CA_CERT" /usr/local/share/ca-certificates/kid-proxy-ca.crt
 update-ca-certificates
 
-# ── 10b. install CA cert into Chromium NSS db for kid user ───────────────────
-info "Installing CA cert into Chromium NSS database for '$KID_USER'..."
+# ── 10b. install CA cert into Chrome NSS db for kid user ─────────────────────
+info "Installing CA cert into Chrome NSS database for '$KID_USER'..."
 _KID_HOME=$(getent passwd "$KID_USER" | cut -d: -f6)
 _NSS_DB="$_KID_HOME/.pki/nssdb"
 mkdir -p "$_NSS_DB"
@@ -169,12 +177,12 @@ certutil -N -d sql:"$_NSS_DB" --empty-password 2>/dev/null || true
 certutil -D -d sql:"$_NSS_DB" -n "kid-proxy-ca" 2>/dev/null || true
 certutil -A -d sql:"$_NSS_DB" -t "CT,," -n "kid-proxy-ca" -i "$CA_CERT"
 chown -R "$KID_USER:$KID_USER" "$_KID_HOME/.pki"
-info "Chromium will trust the proxy CA for '$KID_USER'."
+info "Chrome will trust the proxy CA for '$KID_USER'."
 
-# ── 10c. Chromium enterprise policy ──────────────────────────────────────────
-info "Installing Chromium proxy policy..."
-mkdir -p /etc/chromium/policies/managed
-cat > /etc/chromium/policies/managed/kid-proxy.json <<'JSON'
+# ── 10c. Chrome enterprise policy ────────────────────────────────────────────
+info "Installing Chrome proxy policy..."
+mkdir -p /etc/opt/chrome/policies/managed
+cat > /etc/opt/chrome/policies/managed/kid-proxy.json <<'JSON'
 {
   "ProxySettings": {
     "ProxyMode": "fixed_servers",
