@@ -5,7 +5,8 @@
     "DisablePrivateBrowsing": true,
     "DisableDeveloperTools": true,
     "Certificates": {
-      "ImportEnterpriseRoots": true
+      "ImportEnterpriseRoots": true,
+      "Install": ["/etc/kid-proxy/mitmproxy-ca-cert.pem"]
     },
     "Proxy": {
       "Mode": "manual",
