@@ -76,8 +76,9 @@ info "Installing system dependencies..."
 apt-get update -qq
 apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync
 
-info "Installing Python packages..."
-pip3 install --quiet mitmproxy flask bcrypt
+info "Creating Python venv and installing packages..."
+python3 -m venv /opt/kid-proxy/venv
+/opt/kid-proxy/venv/bin/pip install --quiet mitmproxy flask bcrypt
 
 # ── 3. system user ───────────────────────────────────────────────────────────
 if ! id kidproxy &>/dev/null; then
@@ -104,7 +105,7 @@ chmod 750 /opt/kid-proxy /var/lib/kid-proxy
 
 # ── 6. initialise database ───────────────────────────────────────────────────
 info "Initialising SQLite database..."
-sudo -u kidproxy python3 -c "import sys; sys.path.insert(0,'/opt/kid-proxy'); import db; db.init_db()"
+sudo -u kidproxy /opt/kid-proxy/venv/bin/python -c "import sys; sys.path.insert(0,'/opt/kid-proxy'); import db; db.init_db()"
 
 # ── 7. admin password ────────────────────────────────────────────────────────
 echo ""
@@ -115,7 +116,7 @@ while true; do
   warn "Passwords don't match, try again."
 done
 
-python3 -c "
+/opt/kid-proxy/venv/bin/python -c "
 import bcrypt, sys
 h = bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode()
 print(h)
@@ -133,7 +134,7 @@ chown -R kidproxy:kidproxy /etc/kid-proxy
 # ── 9. generate mitmproxy CA cert ────────────────────────────────────────────
 info "Generating mitmproxy CA certificate..."
 # Start briefly on an unused port just to trigger cert generation, then stop
-sudo -u kidproxy mitmdump --set confdir=/etc/kid-proxy --listen-port 13128 &
+sudo -u kidproxy /opt/kid-proxy/venv/bin/mitmdump --set confdir=/etc/kid-proxy --listen-port 13128 &
 MITM_PID=$!
 sleep 4
 kill "$MITM_PID" 2>/dev/null || true

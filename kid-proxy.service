@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 Type=simple
 User=kidproxy
 EnvironmentFile=/etc/kid-proxy/env
-ExecStart=/usr/local/bin/mitmdump \
+ExecStart=/opt/kid-proxy/venv/bin/mitmdump \
     --set confdir=/etc/kid-proxy \
     --listen-host 127.0.0.1 \
     --listen-port 3128 \
