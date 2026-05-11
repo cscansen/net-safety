@@ -232,7 +232,12 @@ class KidFilter:
 
         matched = _base_domain(host)
         if matched is None:
-            db.log_blocked(host, flow.request.pretty_url)
+            # Only queue for review on top-level navigations, not sub-resources
+            # (images, scripts, fonts, XHR) that load as part of the blocked page.
+            # Sec-Fetch-Mode is absent on non-browser requests — treat those as navigate.
+            mode = flow.request.headers.get("sec-fetch-mode", "navigate")
+            if mode == "navigate":
+                db.log_blocked(host, flow.request.pretty_url)
             flow.response = _make_response(BLOCKED_TMPL, host)
             return
 
