@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — deploy kid parental control proxy on nephew's laptop
+# setup.sh — deploy kid parental control proxy
 # Run as: sudo bash setup.sh
 set -euo pipefail
 
@@ -12,15 +12,51 @@ fatal() { echo -e "${RED}[✗]${NC} $*"; exit 1; }
 
 [[ $EUID -ne 0 ]] && fatal "Run with sudo: sudo bash setup.sh"
 
-# ── 1. dependencies ──────────────────────────────────────────────────────────
+# ── 1. kid account ───────────────────────────────────────────────────────────
+echo ""
+echo "══════════════════════════════════════════"
+echo "  Kid account setup"
+echo "══════════════════════════════════════════"
+read -rp "  Kid's username [buddy]: " KID_USER
+KID_USER="${KID_USER:-buddy}"
+
+if id "$KID_USER" &>/dev/null; then
+  warn "User '$KID_USER' already exists."
+  read -rp "  Lock down this existing account? [y/N]: " CONFIRM
+  [[ "${CONFIRM,,}" == "y" ]] || fatal "Aborted."
+  # Warn if the account has sudo
+  if groups "$KID_USER" | grep -qw sudo; then
+    warn "WARNING: '$KID_USER' is in the sudo group — this account should not have sudo."
+    read -rp "  Remove from sudo group? [Y/n]: " RM_SUDO
+    [[ "${RM_SUDO,,}" != "n" ]] && gpasswd -d "$KID_USER" sudo && info "Removed from sudo."
+  fi
+else
+  info "Creating standard user '$KID_USER'..."
+  adduser --disabled-password --gecos "" "$KID_USER"
+  while true; do
+    read -rsp "  Set password for '$KID_USER': " KP1; echo
+    read -rsp "  Confirm password:              " KP2; echo
+    [[ "$KP1" == "$KP2" ]] && break
+    warn "Passwords don't match, try again."
+  done
+  echo "$KID_USER:$KP1" | chpasswd
+  info "User '$KID_USER' created."
+fi
+
+# Persist username for Timekpr and future reference
+mkdir -p /etc/kid-proxy
+echo "$KID_USER" > /etc/kid-proxy/kid-user
+info "Kid username '$KID_USER' saved to /etc/kid-proxy/kid-user"
+
+# ── 2. dependencies ──────────────────────────────────────────────────────────
 info "Installing system dependencies..."
 apt-get update -qq
-apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl
+apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync
 
 info "Installing Python packages..."
 pip3 install --quiet mitmproxy flask bcrypt
 
-# ── 2. system user ───────────────────────────────────────────────────────────
+# ── 3. system user ───────────────────────────────────────────────────────────
 if ! id kidproxy &>/dev/null; then
   info "Creating kidproxy system user..."
   useradd --system --no-create-home --shell /usr/sbin/nologin kidproxy
@@ -28,13 +64,12 @@ else
   info "kidproxy user already exists, skipping."
 fi
 
-# ── 3. directories ───────────────────────────────────────────────────────────
+# ── 4. directories ───────────────────────────────────────────────────────────
 info "Creating directories..."
 mkdir -p /opt/kid-proxy/templates
 mkdir -p /var/lib/kid-proxy
-mkdir -p /etc/kid-proxy
 
-# ── 4. copy files ────────────────────────────────────────────────────────────
+# ── 5. copy files ────────────────────────────────────────────────────────────
 info "Copying proxy files..."
 cp "$SCRIPT_DIR/db.py"          /opt/kid-proxy/
 cp "$SCRIPT_DIR/proxy_addon.py" /opt/kid-proxy/
@@ -44,11 +79,11 @@ cp "$SCRIPT_DIR/templates/"*    /opt/kid-proxy/templates/
 chown -R kidproxy:kidproxy /opt/kid-proxy /var/lib/kid-proxy
 chmod 750 /opt/kid-proxy /var/lib/kid-proxy
 
-# ── 5. initialise database ───────────────────────────────────────────────────
+# ── 6. initialise database ───────────────────────────────────────────────────
 info "Initialising SQLite database..."
 sudo -u kidproxy python3 -c "import sys; sys.path.insert(0,'/opt/kid-proxy'); import db; db.init_db()"
 
-# ── 6. admin password ────────────────────────────────────────────────────────
+# ── 7. admin password ────────────────────────────────────────────────────────
 echo ""
 while true; do
   read -rsp "  Set admin password: " PW1; echo
@@ -63,7 +98,7 @@ h = bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode()
 print(h)
 " "$PW1" > /etc/kid-proxy/admin.hash
 
-# ── 7. flask secret ──────────────────────────────────────────────────────────
+# ── 8. flask secret ──────────────────────────────────────────────────────────
 FLASK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 cat > /etc/kid-proxy/env <<EOF
 FLASK_SECRET=${FLASK_SECRET}
@@ -72,7 +107,7 @@ EOF
 chmod 600 /etc/kid-proxy/admin.hash /etc/kid-proxy/env
 chown -R kidproxy:kidproxy /etc/kid-proxy
 
-# ── 8. generate mitmproxy CA cert ────────────────────────────────────────────
+# ── 9. generate mitmproxy CA cert ────────────────────────────────────────────
 info "Generating mitmproxy CA certificate..."
 # Start briefly on an unused port just to trigger cert generation, then stop
 sudo -u kidproxy mitmdump --set confdir=/etc/kid-proxy --listen-port 13128 &
@@ -84,7 +119,7 @@ wait "$MITM_PID" 2>/dev/null || true
 CA_CERT=/etc/kid-proxy/mitmproxy-ca-cert.pem
 [[ -f "$CA_CERT" ]] || fatal "CA cert not generated at $CA_CERT — check mitmproxy logs."
 
-# ── 9. install CA cert into system trust store ───────────────────────────────
+# ── 10. install CA cert into system trust store ──────────────────────────────
 info "Installing CA cert into system trust store..."
 cp "$CA_CERT" /usr/local/share/ca-certificates/kid-proxy-ca.crt
 update-ca-certificates
@@ -164,8 +199,13 @@ echo ""
 echo "  Firefox will trust the proxy CA via ImportEnterpriseRoots."
 echo "  Restart Firefox after first login to pick up the new policy."
 echo ""
+echo "  Kid account       : $KID_USER"
 echo "  Parent Review URL : http://localhost:9090"
 echo "  Proxy             : 127.0.0.1:3128 (locked in Firefox policy)"
+echo ""
+echo "  Next: configure Timekpr for '$KID_USER'"
+echo "    timekpra --setallowedweekdays $KID_USER 1,2,3,4,5,6,7"
+echo "    timekpra --settimelimits $KID_USER 120,120,120,120,120,180,180"
 echo ""
 warn "If proxy service fails, Firefox cannot reach the internet (fail-closed)."
 echo "══════════════════════════════════════════"
