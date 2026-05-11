@@ -35,7 +35,8 @@ def init_db():
                 domain              TEXT UNIQUE NOT NULL,
                 daily_limit_minutes INTEGER DEFAULT 30,
                 approved_by         TEXT,
-                approved_at         DATETIME DEFAULT (datetime('now'))
+                approved_at         DATETIME DEFAULT (datetime('now')),
+                active              INTEGER NOT NULL DEFAULT 1
             );
 
             CREATE TABLE IF NOT EXISTS session_log (
@@ -69,9 +70,11 @@ def init_db():
 
 
 def get_whitelist():
-    """Return {domain: daily_limit_minutes} for all approved domains."""
+    """Return {domain: daily_limit_minutes} for active (approved) domains only."""
     with get_conn() as conn:
-        rows = conn.execute("SELECT domain, daily_limit_minutes FROM whitelist").fetchall()
+        rows = conn.execute(
+            "SELECT domain, daily_limit_minutes FROM whitelist WHERE active = 1"
+        ).fetchall()
     return {r["domain"]: r["daily_limit_minutes"] for r in rows}
 
 
@@ -112,13 +115,13 @@ def get_review_data():
         return conn.execute("""
             SELECT
                 bl.domain,
-                COUNT(*)                                   AS attempt_count,
-                MAX(bl.attempted_at)                       AS last_attempted,
-                w.domain IS NOT NULL                       AS is_approved,
+                COUNT(*)                                        AS attempt_count,
+                MAX(bl.attempted_at)                            AS last_attempted,
+                COALESCE(w.active, -1)                         AS status,
                 w.daily_limit_minutes,
                 w.approved_by,
                 w.approved_at,
-                COALESCE(SUM(sl.duration_seconds), 0) / 60.0 AS minutes_used_today
+                COALESCE(SUM(sl.duration_seconds), 0) / 60.0   AS minutes_used_today
             FROM blocked_log bl
             LEFT JOIN whitelist w ON w.domain = bl.domain
             LEFT JOIN session_log sl
@@ -241,16 +244,20 @@ def apply_parent_review(approved_domains_limits, approved_by=None):
             r["domain"]
             for r in conn.execute("SELECT DISTINCT domain FROM blocked_log")
         }
-        # Remove revoked domains (only ones that have been attempted)
+        # Soft-delete revoked domains (only ones that have been attempted)
         for domain in attempted - set(approved_domains_limits):
-            conn.execute("DELETE FROM whitelist WHERE domain = ?", (domain,))
-        # Upsert approved domains
+            conn.execute(
+                "UPDATE whitelist SET active = 0 WHERE domain = ? AND active = 1",
+                (domain,),
+            )
+        # Upsert approved domains (reactivates previously denied ones)
         for domain, limit in approved_domains_limits.items():
             conn.execute("""
-                INSERT INTO whitelist (domain, daily_limit_minutes, approved_by, approved_at)
-                VALUES (?, ?, ?, datetime('now'))
+                INSERT INTO whitelist (domain, daily_limit_minutes, approved_by, approved_at, active)
+                VALUES (?, ?, ?, datetime('now'), 1)
                 ON CONFLICT(domain) DO UPDATE SET
                     daily_limit_minutes = excluded.daily_limit_minutes,
                     approved_by         = excluded.approved_by,
-                    approved_at         = excluded.approved_at
+                    approved_at         = excluded.approved_at,
+                    active              = 1
             """, (domain, limit, approved_by))

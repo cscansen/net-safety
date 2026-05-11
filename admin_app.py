@@ -88,11 +88,13 @@ def review():
     rows = db.get_review_data()
     domains = []
     for r in rows:
+        status = r["status"]  # 1=approved, 0=denied, -1=outstanding
         domains.append({
             "domain":        r["domain"],
             "attempts":      r["attempt_count"],
             "last_seen":     _fmt_age(r["last_attempted"]),
-            "approved":      bool(r["is_approved"]),
+            "approved":      status == 1,
+            "denied":        status == 0,
             "limit_minutes": r["daily_limit_minutes"],
             "used_minutes":  round(r["minutes_used_today"], 1),
             "approved_by":   r["approved_by"] or "—",

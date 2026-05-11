@@ -167,6 +167,37 @@
     font-weight: 600; cursor: pointer;
   }
   .btn-bypass-off:hover { background: #b71c1c; }
+
+  /* ── filter tabs ── */
+  .filter-tabs {
+    max-width: 800px;
+    margin: 0 auto 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tab {
+    padding: 7px 18px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 2px solid transparent;
+    background: #fff;
+    color: #555;
+    transition: all .15s;
+  }
+  .tab:hover { border-color: #ccc; }
+  .tab.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+  .tab .count {
+    display: inline-block;
+    background: rgba(0,0,0,.12);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 11px;
+    margin-left: 5px;
+  }
+  .tab.active .count { background: rgba(255,255,255,.3); }
 </style>
 </head>
 <body>
@@ -208,6 +239,21 @@
   </div>
 </div>
 
+<div class="filter-tabs">
+  <button class="tab active" onclick="filterDomains('all', this)">
+    All <span class="count" id="cnt-all">0</span>
+  </button>
+  <button class="tab" onclick="filterDomains('outstanding', this)">
+    Outstanding <span class="count" id="cnt-outstanding">0</span>
+  </button>
+  <button class="tab" onclick="filterDomains('approved', this)">
+    Approved <span class="count" id="cnt-approved">0</span>
+  </button>
+  <button class="tab" onclick="filterDomains('denied', this)">
+    Denied <span class="count" id="cnt-denied">0</span>
+  </button>
+</div>
+
 <form method="post" action="/apply">
   <div class="card">
     {% if domains %}
@@ -224,7 +270,7 @@
       </thead>
       <tbody>
         {% for d in domains %}
-        <tr>
+        <tr data-status="{{ 'approved' if d.approved else ('denied' if d.denied else 'outstanding') }}">
           <!-- Domain -->
           <td>
             <div class="domain-name">{{ d.domain }}</div>
@@ -300,6 +346,27 @@ function toggleLimit(checkbox, limitId) {
   const input = document.getElementById(limitId);
   input.disabled = !checkbox.checked;
 }
+
+function filterDomains(filter, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('tbody tr').forEach(row => {
+    const s = row.dataset.status;
+    row.style.display = (filter === 'all' || s === filter) ? '' : 'none';
+  });
+}
+
+(function initCounts() {
+  const counts = { all: 0, outstanding: 0, approved: 0, denied: 0 };
+  document.querySelectorAll('tbody tr').forEach(row => {
+    counts.all++;
+    counts[row.dataset.status]++;
+  });
+  ['all','outstanding','approved','denied'].forEach(k => {
+    const el = document.getElementById('cnt-' + k);
+    if (el) el.textContent = counts[k];
+  });
+})();
 </script>
 </body>
 </html>
