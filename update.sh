@@ -29,6 +29,7 @@ git pull origin main --quiet
 
 rsync -a --delete \
     --exclude='.git' \
+    --exclude='venv' \
     --exclude='update.sh' \
     --exclude='kid-update.service' \
     --exclude='kid-update.timer' \
