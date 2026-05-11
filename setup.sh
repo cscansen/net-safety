@@ -172,6 +172,11 @@ update-ca-certificates
 info "Installing CA cert into Chrome NSS database for '$KID_USER'..."
 _KID_HOME=$(getent passwd "$KID_USER" | cut -d: -f6)
 _NSS_DB="$_KID_HOME/.pki/nssdb"
+# Wipe and recreate if the db is missing or corrupt
+if ! certutil -L -d sql:"$_NSS_DB" &>/dev/null; then
+  warn "NSS db missing or corrupt — rebuilding..."
+  rm -rf "$_NSS_DB"
+fi
 mkdir -p "$_NSS_DB"
 certutil -N -d sql:"$_NSS_DB" --empty-password 2>/dev/null || true
 certutil -D -d sql:"$_NSS_DB" -n "kid-proxy-ca" 2>/dev/null || true
@@ -186,7 +191,7 @@ cat > /etc/opt/chrome/policies/managed/kid-proxy.json <<'JSON'
 {
   "ProxySettings": {
     "ProxyMode": "fixed_servers",
-    "ProxyServer": "http://127.0.0.1:3128",
+    "ProxyServer": "127.0.0.1:3128",
     "ProxyBypassList": "localhost,127.0.0.1"
   }
 }
