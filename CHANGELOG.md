@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2] - 2026-05-11
+
+### Added
+- **Per-domain clear button** — each row in the review table now has a small "× clear" button that wipes all history for that domain (blocked log, whitelist entry, and session log). Useful for resetting test state or removing noise entries without touching the rest of the list.
+
+---
+
 ## [0.7.1] - 2026-05-11
 
 ### Fixed

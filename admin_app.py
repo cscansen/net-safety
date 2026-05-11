@@ -148,6 +148,17 @@ def apply():
     return redirect(url_for("review"))
 
 
+@app.post("/delete")
+def delete_domain():
+    redir = _require_auth()
+    if redir:
+        return redir
+    domain = request.form.get("domain", "").strip()
+    if domain:
+        db.delete_domain(domain)
+    return redirect(url_for("review"))
+
+
 @app.post("/bypass")
 def bypass():
     redir = _require_auth()

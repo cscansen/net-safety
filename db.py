@@ -268,6 +268,14 @@ def set_bypass(until_ts):
             )
 
 
+def delete_domain(domain):
+    """Wipe all history for a domain: blocked log, whitelist entry, and session log."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM blocked_log WHERE domain = ?", (domain,))
+        conn.execute("DELETE FROM whitelist   WHERE domain = ?", (domain,))
+        conn.execute("DELETE FROM session_log WHERE domain = ?", (domain,))
+
+
 def apply_parent_review(approved_domains_limits, approved_by=None):
     """
     approved_domains_limits: {domain: limit_minutes | None}
