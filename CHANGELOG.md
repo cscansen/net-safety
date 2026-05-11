@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.0] - 2026-05-11
+
+### Added
+- **kid-lockdown.sh** — hides 28 admin/system app menu entries from the kid account via per-user `NoDisplay` overrides (no uninstalls; admin account is unaffected). Idempotent and accepts a username argument for reuse on sibling machines.
+- **Age-based profiles** — lockdown accepts a `profile` argument (`restricted` / `tween` / `teen`). `restricted` is fully implemented (age ~6). `tween` and `teen` are scaffolded and fall back to `restricted` until implemented.
+- **Silent auto-updates** — enables `mintupdate-automation-upgrade.timer` and `mintupdate-automation-autoremove.timer` so the OS patches daily without any GUI interaction.
+- **Interactive lockdown in setup.sh** — after account creation, setup now asks whether to apply lockdown, which profile to use, and whether any additional accounts (siblings) should also be locked down.
+
+---
+
 ## [0.3.0] - 2026-05-11
 
 ### Added

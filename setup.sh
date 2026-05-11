@@ -190,8 +190,29 @@ systemctl enable --now kid-update.timer
 info "Auto-update timer enabled (pulls every 15 min)."
 
 # ── 13. kid account lockdown ────────────────────────────────────────────────
-info "Applying kid account lockdown (hiding admin tools, enabling auto-updates)..."
-bash "$SCRIPT_DIR/kid-lockdown.sh" "$KID_USER"
+echo ""
+read -rp "  Apply lockdown to '$KID_USER'? [Y/n]: " DO_LOCKDOWN
+if [[ "${DO_LOCKDOWN,,}" != "n" ]]; then
+  echo "  Profiles: restricted (age ~6, default) | tween (age ~9, planned) | teen (age ~13, planned)"
+  read -rp "  Profile [restricted]: " LOCKDOWN_PROFILE
+  LOCKDOWN_PROFILE="${LOCKDOWN_PROFILE:-restricted}"
+  bash "$SCRIPT_DIR/kid-lockdown.sh" "$KID_USER" "$LOCKDOWN_PROFILE"
+fi
+
+# Lock down any additional accounts (e.g. siblings sharing the same machine)
+while true; do
+  echo ""
+  read -rp "  Lock down an additional account? [y/N]: " MORE_LOCKDOWN
+  [[ "${MORE_LOCKDOWN,,}" == "y" ]] || break
+  read -rp "    Username: " EXTRA_USER
+  if ! id "$EXTRA_USER" &>/dev/null; then
+    warn "User '$EXTRA_USER' not found — skipping."
+    continue
+  fi
+  read -rp "    Profile [restricted]: " EXTRA_PROFILE
+  EXTRA_PROFILE="${EXTRA_PROFILE:-restricted}"
+  bash "$SCRIPT_DIR/kid-lockdown.sh" "$EXTRA_USER" "$EXTRA_PROFILE"
+done
 
 # ── 14. verify ───────────────────────────────────────────────────────────────
 echo ""
