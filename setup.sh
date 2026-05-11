@@ -214,15 +214,60 @@ while true; do
   bash "$SCRIPT_DIR/kid-lockdown.sh" "$EXTRA_USER" "$EXTRA_PROFILE"
 done
 
-# ── 14. verify ───────────────────────────────────────────────────────────────
+# ── 14. ElecFreaks KB mirror ─────────────────────────────────────────────────
+echo ""
+read -rp "  Set up ElecFreaks KB mirror (offline fallback)? [Y/n]: " DO_KB
+if [[ "${DO_KB,,}" != "n" ]]; then
+  info "Installing nginx..."
+  apt-get install -y nginx wget curl
+
+  info "Configuring nginx on :8080..."
+  cp "$SCRIPT_DIR/elecfreaks-nginx.conf" /etc/nginx/sites-available/elecfreaks-kb
+  ln -sf /etc/nginx/sites-available/elecfreaks-kb /etc/nginx/sites-enabled/elecfreaks-kb
+  # Disable the default nginx site so :80 isn't claimed
+  rm -f /etc/nginx/sites-enabled/default
+  nginx -t && systemctl enable --now nginx
+
+  info "Installing launcher and sync script..."
+  cp "$SCRIPT_DIR/elecfreaks-kb-launcher" /usr/local/bin/elecfreaks-kb-launcher
+  cp "$SCRIPT_DIR/elecfreaks-sync.sh"     /usr/local/bin/elecfreaks-sync
+  chmod +x /usr/local/bin/elecfreaks-kb-launcher /usr/local/bin/elecfreaks-sync
+
+  info "Installing ElecFreaks desktop icon for '$KID_USER'..."
+  KID_DESKTOP="/home/$KID_USER/Desktop"
+  mkdir -p "$KID_DESKTOP"
+  chown "$KID_USER:$KID_USER" "$KID_DESKTOP"
+  ICON_PATH="$KID_DESKTOP/elecfreaks-kb.desktop"
+  cp "$SCRIPT_DIR/elecfreaks-kb.desktop" "$ICON_PATH"
+  chmod +x "$ICON_PATH"
+  chown root:root "$ICON_PATH"
+  # Trust the launcher in Nemo so it opens directly without the safety dialog
+  sudo -u "$KID_USER" gio set "$ICON_PATH" metadata::trusted true 2>/dev/null || true
+  # Immutable — kid cannot delete or move it
+  chattr +i "$ICON_PATH"
+  info "Icon installed (immutable): $ICON_PATH"
+
+  info "Enabling weekly sync timer..."
+  cp "$SCRIPT_DIR/elecfreaks-sync.service" /etc/systemd/system/
+  cp "$SCRIPT_DIR/elecfreaks-sync.timer"   /etc/systemd/system/
+  systemctl daemon-reload
+  systemctl enable --now elecfreaks-sync.timer
+
+  info "Starting initial mirror in background (this takes a while)..."
+  nohup /usr/local/bin/elecfreaks-sync >> /var/log/elecfreaks-sync.log 2>&1 &
+  info "Mirror running in background. Check progress: tail -f /var/log/elecfreaks-sync.log"
+fi
+
+# ── 15. verify ───────────────────────────────────────────────────────────────
 echo ""
 info "Waiting for services to start..."
 sleep 5
 
-PROXY_OK=false; ADMIN_OK=false; TIMER_OK=false
-systemctl is-active --quiet kid-proxy  && PROXY_OK=true
-systemctl is-active --quiet kid-admin  && ADMIN_OK=true
+PROXY_OK=false; ADMIN_OK=false; TIMER_OK=false; NGINX_OK=false
+systemctl is-active --quiet kid-proxy       && PROXY_OK=true
+systemctl is-active --quiet kid-admin       && ADMIN_OK=true
 systemctl is-active --quiet kid-update.timer && TIMER_OK=true
+systemctl is-active --quiet nginx           && NGINX_OK=true
 
 echo ""
 echo "══════════════════════════════════════════"
@@ -234,6 +279,8 @@ $ADMIN_OK && echo -e "  Admin  : ${GREEN}running${NC} (localhost:9090)" \
            || echo -e "  Admin  : ${RED}NOT running${NC} — check: journalctl -u kid-admin"
 $TIMER_OK && echo -e "  Updates: ${GREEN}active${NC} (weekly from GitHub)" \
            || echo -e "  Updates: ${RED}not active${NC} — check: systemctl status kid-update.timer"
+$NGINX_OK && echo -e "  KB     : ${GREEN}running${NC} (localhost:8080, mirror syncing in background)" \
+           || echo -e "  KB     : ${YELLOW}not running${NC} (skipped or check: systemctl status nginx)"
 echo ""
 echo "  Firefox will trust the proxy CA via ImportEnterpriseRoots."
 echo "  Restart Firefox after first login to pick up the new policy."

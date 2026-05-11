@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.5.0] - 2026-05-11
+
+### Added
+- **ElecFreaks KB mirror** — `elecfreaks-sync.sh` mirrors `wiki.elecfreaks.com/en/microbit/` to `/var/www/elecfreaks-kb/` via wget. Weekly systemd timer keeps it fresh.
+- **Offline-first launcher** — `elecfreaks-kb-launcher` checks connectivity and opens the live wiki if reachable, falls back to the local nginx mirror transparently. Single desktop icon, no choice required from the kid.
+- **Kid-proof desktop icon** — `.desktop` file placed on kid's Desktop, marked trusted (Nemo), then `chattr +i` so it cannot be deleted or moved.
+- **nginx on :8080** — serves the local mirror; setup.sh installs and configures it as part of the KB step.
+- **KB mirror step in setup.sh** — optional step 14 with Y/n prompt; initial sync runs in background. Status reported in the final verify summary.
+
+---
+
 ## [0.4.0] - 2026-05-11
 
 ### Added

@@ -1,0 +1,6 @@
+[Unit]
+Description=ElecFreaks KB mirror sync
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/elecfreaks-sync
