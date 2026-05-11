@@ -129,6 +129,13 @@
   }
   .btn-apply:hover { background: #155db2; }
 
+  /* ── mobile table scroll ── */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  @media (max-width: 600px) {
+    input[type=checkbox] { width: 28px; height: 28px; }
+    .btn-apply { width: 100%; }
+  }
+
   /* ── empty state ── */
   .empty {
     padding: 60px 24px;
@@ -257,6 +264,7 @@
 <form method="post" action="/apply">
   <div class="card">
     {% if domains %}
+    <div class="table-scroll">
     <table>
       <thead>
         <tr>
@@ -337,6 +345,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% else %}
     <div class="empty">
       <div class="big">✅</div>

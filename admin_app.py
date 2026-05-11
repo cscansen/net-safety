@@ -1,6 +1,7 @@
 """
 Kid proxy admin web interface.
-Runs on localhost:9090. Accessible from the kid's browser via Firefox proxy passthrough.
+Binds to 0.0.0.0:9090 — reachable from any LAN device via http://<hostname>.local:9090
+(mDNS via avahi-daemon). Accessible from the kid's browser via Firefox proxy passthrough.
 """
 
 import os
@@ -253,4 +254,4 @@ def accounts_delete():
 if __name__ == "__main__":
     db.init_db()
     db.migrate_legacy_admin()
-    app.run(host="127.0.0.1", port=9090, debug=False)
+    app.run(host="0.0.0.0", port=9090, debug=False)

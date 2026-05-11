@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0] - 2026-05-11
+
+### Added
+- **LAN-accessible admin UI** — Flask now binds to `0.0.0.0:9090` instead of `127.0.0.1`. Parents can reach the review page from any device on the home network.
+- **mDNS discovery** — `avahi-daemon` added to setup dependencies. No DNS required; devices find the admin UI at `http://<hostname>.local:9090` automatically (iOS, Android, macOS native; Windows via Bonjour).
+- **UFW rules** — setup.sh opens port 9090 to all RFC1918 subnets (`192.168.0.0/16`, `172.16.0.0/12`) if UFW is present.
+
+### Changed
+- **review.html** — table wrapped in horizontal scroll container so it doesn't overflow on phone screens. Checkboxes and Apply button enlarged for touch targets on narrow viewports.
+
+---
+
 ## [0.4.0] - 2026-05-11
 
 ### Added

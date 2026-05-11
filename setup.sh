@@ -74,7 +74,7 @@ info "Kid username '$KID_USER' saved to /etc/kid-proxy/kid-user"
 # ── 2. dependencies ──────────────────────────────────────────────────────────
 info "Installing system dependencies..."
 apt-get update -qq
-apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync
+apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync avahi-daemon
 
 info "Creating Python venv and installing packages..."
 python3 -m venv /opt/kid-proxy/venv
@@ -171,6 +171,13 @@ cp "$SCRIPT_DIR/kid-update.service" /etc/systemd/system/
 cp "$SCRIPT_DIR/kid-update.timer"   /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now kid-proxy kid-admin
+
+# ── 11b. UFW — open kid-admin to LAN ─────────────────────────────────────────
+if command -v ufw &>/dev/null; then
+  ufw allow from 192.168.0.0/16 to any port 9090 comment "kid-admin LAN"
+  ufw allow from 172.16.0.0/12  to any port 9090 comment "kid-admin LAN"
+  info "UFW: port 9090 open to RFC1918 subnets."
+fi
 
 # ── 12. clone repo for auto-update ──────────────────────────────────────────
 REPO_DIR=/opt/net-safety-src
