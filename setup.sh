@@ -197,7 +197,7 @@ $PROXY_OK && echo -e "  Proxy  : ${GREEN}running${NC} (localhost:3128)" \
            || echo -e "  Proxy  : ${RED}NOT running${NC} — check: journalctl -u kid-proxy"
 $ADMIN_OK && echo -e "  Admin  : ${GREEN}running${NC} (localhost:9090)" \
            || echo -e "  Admin  : ${RED}NOT running${NC} — check: journalctl -u kid-admin"
-$TIMER_OK && echo -e "  Updates: ${GREEN}active${NC} (every 15 min from GitHub)" \
+$TIMER_OK && echo -e "  Updates: ${GREEN}active${NC} (weekly from GitHub)" \
            || echo -e "  Updates: ${RED}not active${NC} — check: systemctl status kid-update.timer"
 echo ""
 echo "  Firefox will trust the proxy CA via ImportEnterpriseRoots."
