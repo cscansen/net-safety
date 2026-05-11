@@ -90,15 +90,17 @@ def review():
     for r in rows:
         status = r["status"]  # 1=approved, 0=denied, -1=outstanding
         domains.append({
-            "domain":        r["domain"],
-            "attempts":      r["attempt_count"],
-            "last_seen":     _fmt_age(r["last_attempted"]),
-            "approved":      status == 1,
-            "denied":        status == 0,
-            "limit_minutes": r["daily_limit_minutes"],
-            "used_minutes":  round(r["minutes_used_today"], 1),
-            "approved_by":   r["approved_by"] or "—",
-            "approved_at":   _fmt_age(r["approved_at"]),
+            "domain":              r["domain"],
+            "attempts":            r["attempt_count"],
+            "last_seen":           _fmt_age(r["last_attempted"]),
+            "approved":            status == 1,
+            "denied":              status == 0,
+            "daily_limit":         r["daily_limit_minutes"],
+            "weekly_limit":        r["weekly_limit_minutes"],
+            "used_today":          round(r["minutes_used_today"], 1),
+            "used_week":           round(r["minutes_used_week"], 1),
+            "approved_by":         r["approved_by"] or "—",
+            "approved_at":         _fmt_age(r["approved_at"]),
         })
 
     bypass_until = db.get_bypass_until()
@@ -132,12 +134,14 @@ def apply():
         if not key.startswith("allow_"):
             continue
         domain = key[len("allow_"):]
-        raw_limit = form.get(f"limit_{domain}", "").strip()
-        try:
-            limit = max(1, int(raw_limit))
-        except (ValueError, TypeError):
-            limit = db.DEFAULT_LIMIT_MINUTES
-        approved[domain] = limit
+        def _parse_limit(val, default=db.DEFAULT_LIMIT_MINUTES):
+            try:
+                return max(1, int(val.strip())) if val.strip() else None
+            except (ValueError, TypeError):
+                return default
+        daily  = _parse_limit(form.get(f"daily_{domain}",  ""))
+        weekly = _parse_limit(form.get(f"weekly_{domain}", ""), default=None)
+        approved[domain] = (daily, weekly)
 
     db.apply_parent_review(approved, approved_by=session["admin_username"])
     return redirect(url_for("review"))

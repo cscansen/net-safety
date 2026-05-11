@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0] - 2026-05-11
+
+### Added
+- **Weekly time limits** — each approved domain now supports a per-day and a per-week minute budget (enforced independently; whichever runs out first blocks access).
+- **Countdown widget** — a small floating timer is injected into every HTML page on a timed domain, showing time remaining. Turns orange under 5 min, red under 1 min.
+- **Weekly usage display** — review table shows today's and this week's usage alongside the limits.
+
+### Changed
+- DB migration runs automatically on startup — existing installs gain the `weekly_limit_minutes` column with no manual steps.
+
+---
+
 ## [0.2.0] - 2026-05-11
 
 ### Added

@@ -31,12 +31,13 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS whitelist (
-                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
-                domain              TEXT UNIQUE NOT NULL,
-                daily_limit_minutes INTEGER DEFAULT 30,
-                approved_by         TEXT,
-                approved_at         DATETIME DEFAULT (datetime('now')),
-                active              INTEGER NOT NULL DEFAULT 1
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain               TEXT UNIQUE NOT NULL,
+                daily_limit_minutes  INTEGER DEFAULT 30,
+                weekly_limit_minutes INTEGER DEFAULT NULL,
+                approved_by          TEXT,
+                approved_at          DATETIME DEFAULT (datetime('now')),
+                active               INTEGER NOT NULL DEFAULT 1
             );
 
             CREATE TABLE IF NOT EXISTS session_log (
@@ -62,6 +63,17 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_blocked_domain ON blocked_log(domain);
             CREATE INDEX IF NOT EXISTS idx_session_domain_date ON session_log(domain, session_date);
         """)
+        # Migrate: add columns introduced after initial schema
+        for col, defn in [
+            ("weekly_limit_minutes", "INTEGER DEFAULT NULL"),
+            ("approved_by",          "TEXT"),
+            ("active",               "INTEGER NOT NULL DEFAULT 1"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE whitelist ADD COLUMN {col} {defn}")
+            except Exception:
+                pass
+
         for domain, limit in INITIAL_WHITELIST:
             conn.execute(
                 "INSERT OR IGNORE INTO whitelist (domain, daily_limit_minutes) VALUES (?, ?)",
@@ -70,12 +82,13 @@ def init_db():
 
 
 def get_whitelist():
-    """Return {domain: daily_limit_minutes} for active (approved) domains only."""
+    """Return {domain: (daily_limit_minutes, weekly_limit_minutes)} for active domains."""
     with get_conn() as conn:
         rows = conn.execute(
-            "SELECT domain, daily_limit_minutes FROM whitelist WHERE active = 1"
+            "SELECT domain, daily_limit_minutes, weekly_limit_minutes "
+            "FROM whitelist WHERE active = 1"
         ).fetchall()
-    return {r["domain"]: r["daily_limit_minutes"] for r in rows}
+    return {r["domain"]: (r["daily_limit_minutes"], r["weekly_limit_minutes"]) for r in rows}
 
 
 def log_blocked(domain, url):
@@ -97,6 +110,13 @@ def log_session(domain, duration_seconds):
         )
 
 
+def get_week_start():
+    """Return ISO Monday of the current week as a date string."""
+    from datetime import timedelta
+    today = date.today()
+    return (today - timedelta(days=today.weekday())).isoformat()
+
+
 def get_today_db_seconds(domain):
     today = date.today().isoformat()
     with get_conn() as conn:
@@ -108,27 +128,42 @@ def get_today_db_seconds(domain):
     return row["total"] if row else 0
 
 
+def get_this_week_db_seconds(domain):
+    week_start = get_week_start()
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(duration_seconds), 0) AS total FROM session_log "
+            "WHERE domain = ? AND session_date >= ?",
+            (domain, week_start),
+        ).fetchone()
+    return row["total"] if row else 0
+
+
 def get_review_data():
     """All attempted domains with approval status, limits, and today's usage."""
     today = date.today().isoformat()
     with get_conn() as conn:
+        week_start = get_week_start()
         return conn.execute("""
             SELECT
                 bl.domain,
-                COUNT(*)                                        AS attempt_count,
-                MAX(bl.attempted_at)                            AS last_attempted,
-                COALESCE(w.active, -1)                         AS status,
+                COUNT(*)                                         AS attempt_count,
+                MAX(bl.attempted_at)                             AS last_attempted,
+                COALESCE(w.active, -1)                          AS status,
                 w.daily_limit_minutes,
+                w.weekly_limit_minutes,
                 w.approved_by,
                 w.approved_at,
-                COALESCE(SUM(sl.duration_seconds), 0) / 60.0   AS minutes_used_today
+                COALESCE(SUM(CASE WHEN sl.session_date = :today
+                               THEN sl.duration_seconds END), 0) / 60.0  AS minutes_used_today,
+                COALESCE(SUM(CASE WHEN sl.session_date >= :week_start
+                               THEN sl.duration_seconds END), 0) / 60.0  AS minutes_used_week
             FROM blocked_log bl
             LEFT JOIN whitelist w ON w.domain = bl.domain
-            LEFT JOIN session_log sl
-                   ON sl.domain = bl.domain AND sl.session_date = ?
+            LEFT JOIN session_log sl ON sl.domain = bl.domain
             GROUP BY bl.domain
             ORDER BY last_attempted DESC
-        """, (today,)).fetchall()
+        """, {"today": today, "week_start": week_start}).fetchall()
 
 
 ADMIN_HASH_FILE = "/etc/kid-proxy/admin.hash"
@@ -251,13 +286,16 @@ def apply_parent_review(approved_domains_limits, approved_by=None):
                 (domain,),
             )
         # Upsert approved domains (reactivates previously denied ones)
-        for domain, limit in approved_domains_limits.items():
+        for domain, limits in approved_domains_limits.items():
+            daily, weekly = limits if isinstance(limits, tuple) else (limits, None)
             conn.execute("""
-                INSERT INTO whitelist (domain, daily_limit_minutes, approved_by, approved_at, active)
-                VALUES (?, ?, ?, datetime('now'), 1)
+                INSERT INTO whitelist
+                    (domain, daily_limit_minutes, weekly_limit_minutes, approved_by, approved_at, active)
+                VALUES (?, ?, ?, ?, datetime('now'), 1)
                 ON CONFLICT(domain) DO UPDATE SET
-                    daily_limit_minutes = excluded.daily_limit_minutes,
-                    approved_by         = excluded.approved_by,
-                    approved_at         = excluded.approved_at,
-                    active              = 1
-            """, (domain, limit, approved_by))
+                    daily_limit_minutes  = excluded.daily_limit_minutes,
+                    weekly_limit_minutes = excluded.weekly_limit_minutes,
+                    approved_by          = excluded.approved_by,
+                    approved_at          = excluded.approved_at,
+                    active               = 1
+            """, (domain, daily, weekly, approved_by))

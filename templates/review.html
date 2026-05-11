@@ -90,20 +90,20 @@
   }
 
   /* time limit */
-  .limit-wrap { display: flex; align-items: center; gap: 6px; }
+  .limit-wrap { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
   .limit-input {
-    width: 68px;
-    padding: 6px 10px;
+    width: 62px;
+    padding: 6px 8px;
     border: 1px solid #ddd;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 13px;
     text-align: right;
     transition: border-color .2s;
   }
   .limit-input:focus { outline: none; border-color: #1a73e8; }
   .limit-input:disabled { background: #f5f5f5; color: #bbb; border-color: #eee; }
-  .limit-label { font-size: 13px; color: #777; }
-  .used-note { font-size: 12px; color: #999; margin-top: 3px; }
+  .limit-label { font-size: 12px; color: #777; white-space: nowrap; }
+  .used-note { font-size: 11px; color: #bbb; margin-top: 1px; }
 
   /* ── footer ── */
   .footer {
@@ -265,7 +265,7 @@
           <th>Last Seen</th>
           <th>Approved By</th>
           <th style="text-align:center">Allow?</th>
-          <th>Daily Limit</th>
+          <th>Time Limits</th>
         </tr>
       </thead>
       <tbody>
@@ -302,23 +302,35 @@
                    id="chk_{{ loop.index }}"
                    value="{{ d.domain }}"
                    {% if d.approved %}checked{% endif %}
-                   onchange="toggleLimit(this, 'lim_{{ loop.index }}')">
+                   onchange="toggleLimit(this, {{ loop.index }})">
           </td>
 
-          <!-- Time limit -->
+          <!-- Time limits -->
           <td>
             <div class="limit-wrap">
-              <input type="number"
-                     class="limit-input"
-                     id="lim_{{ loop.index }}"
-                     name="limit_{{ d.domain }}"
-                     value="{{ d.limit_minutes if d.limit_minutes is not none else 30 }}"
-                     min="1" max="480"
+              <input type="number" class="limit-input"
+                     id="lim_d_{{ loop.index }}"
+                     name="daily_{{ d.domain }}"
+                     value="{{ d.daily_limit if d.daily_limit is not none else 30 }}"
+                     min="1" max="1440"
                      {% if not d.approved %}disabled{% endif %}>
               <span class="limit-label">min/day</span>
             </div>
-            {% if d.approved and d.used_minutes > 0 %}
-            <div class="used-note">Used today: {{ d.used_minutes }}m</div>
+            <div class="limit-wrap">
+              <input type="number" class="limit-input"
+                     id="lim_w_{{ loop.index }}"
+                     name="weekly_{{ d.domain }}"
+                     value="{{ d.weekly_limit if d.weekly_limit is not none else '' }}"
+                     placeholder="—"
+                     min="1" max="10080"
+                     {% if not d.approved %}disabled{% endif %}>
+              <span class="limit-label">min/week</span>
+            </div>
+            {% if d.approved %}
+            <div class="used-note">
+              Today: {{ d.used_today }}m
+              {% if d.weekly_limit %} &nbsp;·&nbsp; Week: {{ d.used_week }}m{% endif %}
+            </div>
             {% endif %}
           </td>
         </tr>
@@ -342,9 +354,12 @@
 </form>
 
 <script>
-function toggleLimit(checkbox, limitId) {
-  const input = document.getElementById(limitId);
-  input.disabled = !checkbox.checked;
+function toggleLimit(checkbox, idx) {
+  const disabled = !checkbox.checked;
+  ['lim_d_','lim_w_'].forEach(p => {
+    const el = document.getElementById(p + idx);
+    if (el) el.disabled = disabled;
+  });
 }
 
 function filterDomains(filter, btn) {

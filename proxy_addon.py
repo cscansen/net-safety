@@ -2,15 +2,14 @@
 Kid filtering proxy addon for mitmproxy.
 
 Checks each request against the SQLite whitelist.  Blocked domains get a
-friendly block page.  Approved domains with a daily time limit are tracked via
-an in-memory activity-window approach and get a "Time's Up" page when the
-budget is exhausted.
+friendly block page.  Approved domains with time limits are tracked and get
+a "Time's Up" page when the budget is exhausted.  HTML responses for timed
+domains get a floating countdown widget injected.
 """
 
 import sys
 import time
 import threading
-from pathlib import Path
 
 sys.path.insert(0, "/opt/kid-proxy")
 
@@ -21,21 +20,21 @@ from mitmproxy import http
 
 ADMIN_URL = "http://localhost:9090"
 ALWAYS_ALLOWED_HOSTS = {"localhost", "127.0.0.1"}
-CACHE_TTL = 5          # seconds between whitelist DB reads
-IDLE_TIMEOUT = 60      # seconds of inactivity before a session is considered ended
+CACHE_TTL = 5        # seconds between whitelist DB reads
+IDLE_TIMEOUT = 60    # seconds of inactivity before session is considered ended
+BYPASS_CACHE_TTL = 5
 
 # ── state ────────────────────────────────────────────────────────────────────
 
-_whitelist: dict[str, int | None] = {}   # domain -> daily_limit_minutes
+# domain -> (daily_limit_minutes | None, weekly_limit_minutes | None)
+_whitelist: dict[str, tuple[int | None, int | None]] = {}
 _cache_ts: float = 0
 _cache_lock = threading.Lock()
 
-# bypass cache: (monotonic cache_ts, wall-clock bypass_until or None or inf)
 _bypass_cache: tuple[float, float | None] = (0, None)
 _bypass_lock = threading.Lock()
-BYPASS_CACHE_TTL = 5
 
-# {domain: (session_start, last_seen)}  — only for currently active sessions
+# {domain: (session_start, last_seen)}
 _sessions: dict[str, tuple[float, float]] = {}
 _sessions_lock = threading.Lock()
 
@@ -65,7 +64,6 @@ def _refresh_whitelist():
 
 
 def _base_domain(host: str) -> str | None:
-    """Return the matching whitelist domain for host, or None."""
     _refresh_whitelist()
     for domain in _whitelist:
         if host == domain or host.endswith("." + domain):
@@ -73,8 +71,7 @@ def _base_domain(host: str) -> str | None:
     return None
 
 
-def _flush_session(domain: str, now: float):
-    """Close an active session and write duration to DB."""
+def _flush_session(domain: str):
     with _sessions_lock:
         if domain not in _sessions:
             return
@@ -82,17 +79,16 @@ def _flush_session(domain: str, now: float):
     db.log_session(domain, last - start)
 
 
-def _record_activity(domain: str) -> float:
+def _record_activity(domain: str) -> tuple[float, float]:
     """
-    Mark activity for domain.  Returns total seconds used today
-    (DB + current session) so the caller can check against the limit.
+    Record activity and return (today_seconds_used, this_week_seconds_used).
+    Both include the current in-memory session.
     """
     now = time.monotonic()
     with _sessions_lock:
         if domain in _sessions:
             start, last = _sessions[domain]
             if now - last > IDLE_TIMEOUT:
-                # Session lapsed; close it and start a new one
                 _sessions[domain] = (now, now)
                 db.log_session(domain, last - start)
             else:
@@ -101,8 +97,30 @@ def _record_activity(domain: str) -> float:
             _sessions[domain] = (now, now)
         session_seconds = _sessions[domain][1] - _sessions[domain][0]
 
-    db_seconds = db.get_today_db_seconds(domain)
-    return db_seconds + session_seconds
+    today_db  = db.get_today_db_seconds(domain)
+    week_db   = db.get_this_week_db_seconds(domain)
+    return (today_db + session_seconds, week_db + session_seconds)
+
+
+def _seconds_remaining(domain: str) -> int | None:
+    """
+    Return seconds remaining (min of daily and weekly), or None if no limits.
+    Returns 0 if already over budget.
+    """
+    limits = _whitelist.get(domain)
+    if limits is None:
+        return None
+    daily_limit, weekly_limit = limits
+    if daily_limit is None and weekly_limit is None:
+        return None
+
+    today_used, week_used = _record_activity(domain)
+    remaining = float("inf")
+    if daily_limit is not None:
+        remaining = min(remaining, daily_limit * 60 - today_used)
+    if weekly_limit is not None:
+        remaining = min(remaining, weekly_limit * 60 - week_used)
+    return max(0, int(remaining))
 
 
 # ── block pages ──────────────────────────────────────────────────────────────
@@ -153,7 +171,7 @@ BLOCKED_TMPL = _page(
 
 TIMEOUT_TMPL = _page(
     "Time's Up!", "⏰",
-    "Time's up for today!",
+    "Time's up!",
     "You've used up your time on this site. Ask a parent for more time.",
 )
 
@@ -164,7 +182,43 @@ def _make_response(tmpl: str, domain: str, status: int = 403) -> http.Response:
     return http.Response.make(status, body, {"Content-Type": "text/html; charset=utf-8"})
 
 
-# ── addon ────────────────────────────────────────────────────────────────────
+# ── countdown widget ─────────────────────────────────────────────────────────
+
+_COUNTDOWN_WIDGET = """<style>
+#_ns_timer{position:fixed;bottom:12px;right:12px;background:rgba(26,26,46,.85);
+color:#fff;border-radius:12px;padding:8px 14px;font-family:system-ui,sans-serif;
+font-size:13px;z-index:2147483647;backdrop-filter:blur(4px);pointer-events:none;
+transition:background .5s;}
+#_ns_timer.warn{background:rgba(230,81,0,.9);}
+#_ns_timer.urgent{background:rgba(198,40,40,.9);}
+</style>
+<div id="_ns_timer"></div>
+<script>(function(){
+var s=__SECONDS__;
+var el=document.getElementById('_ns_timer');
+function fmt(n){if(n<=0)return"Time’s up!";
+var h=Math.floor(n/3600),m=Math.floor((n%3600)/60),ss=n%60;
+if(h>0)return h+'h '+m+'m left';
+if(m>0)return m+'m '+(ss<10?'0':'')+ss+'s left';
+return ss+'s left';}
+function tick(){el.textContent=fmt(s);
+el.className=s<=60?'urgent':s<=300?'warn':'';
+if(s>0){s--;setTimeout(tick,1000);}}
+tick();
+})();</script>"""
+
+
+def _inject_countdown(html: bytes, seconds: int) -> bytes:
+    widget = _COUNTDOWN_WIDGET.replace("__SECONDS__", str(seconds)).encode()
+    # Inject before </body>; fall back to appending
+    tag = b"</body>"
+    idx = html.lower().rfind(tag)
+    if idx != -1:
+        return html[:idx] + widget + html[idx:]
+    return html + widget
+
+
+# ── addon ─────────────────────────────────────────────────────────────────────
 
 class KidFilter:
     def request(self, flow: http.HTTPFlow):
@@ -177,21 +231,49 @@ class KidFilter:
             return
 
         matched = _base_domain(host)
-
         if matched is None:
-            # Not whitelisted — block and log
             db.log_blocked(host, flow.request.pretty_url)
             flow.response = _make_response(BLOCKED_TMPL, host)
             return
 
-        limit = _whitelist.get(matched)
-        if limit is not None:
-            used_seconds = _record_activity(matched)
-            if used_seconds >= limit * 60:
+        daily_limit, weekly_limit = _whitelist.get(matched, (None, None))
+        if daily_limit is not None or weekly_limit is not None:
+            today_used, week_used = _record_activity(matched)
+            if daily_limit is not None and today_used >= daily_limit * 60:
                 flow.response = _make_response(TIMEOUT_TMPL, host)
                 return
-            # Activity already recorded inside _record_activity
-        # else: no limit, just pass through (no session tracking needed)
+            if weekly_limit is not None and week_used >= weekly_limit * 60:
+                flow.response = _make_response(TIMEOUT_TMPL, host)
+                return
+
+    def response(self, flow: http.HTTPFlow):
+        if _check_bypass():
+            return
+
+        host = flow.request.pretty_host
+        if host in ALWAYS_ALLOWED_HOSTS:
+            return
+
+        matched = _base_domain(host)
+        if matched is None:
+            return
+
+        daily_limit, weekly_limit = _whitelist.get(matched, (None, None))
+        if daily_limit is None and weekly_limit is None:
+            return
+
+        ct = flow.response.headers.get("content-type", "")
+        if "text/html" not in ct:
+            return
+
+        remaining = _seconds_remaining(matched)
+        if remaining is None or remaining <= 0:
+            return
+
+        try:
+            flow.response.content = _inject_countdown(flow.response.content, remaining)
+        except Exception:
+            pass
 
 
 addons = [KidFilter()]
