@@ -4,9 +4,13 @@ Binds to 0.0.0.0:9090 — reachable from any LAN device via http://<hostname>.lo
 (mDNS via avahi-daemon). Accessible from the kid's browser via Firefox proxy passthrough.
 """
 
+import json
 import os
+import re
 import sys
 import time as _time
+import urllib.parse
+import urllib.request
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -157,6 +161,34 @@ def delete_domain():
     if domain:
         db.delete_domain(domain)
     return redirect(url_for("review"))
+
+
+@app.get("/describe/<domain>")
+def describe(domain):
+    redir = _require_auth()
+    if redir:
+        return {"description": ""}
+
+    cached = db.get_cached_description(domain)
+    if cached is not None:
+        return {"description": cached}
+
+    description = ""
+    try:
+        q = urllib.parse.quote(domain)
+        url = f"https://api.duckduckgo.com/?q={q}&format=json&no_html=1&skip_disambig=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "net-safety/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        text = data.get("AbstractText") or data.get("Abstract") or ""
+        if text:
+            sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+            description = " ".join(sentences[:3])
+    except Exception:
+        pass
+
+    db.cache_description(domain, description)
+    return {"description": description}
 
 
 @app.post("/clear-all")

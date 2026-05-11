@@ -14,7 +14,10 @@ import threading
 sys.path.insert(0, "/opt/kid-proxy")
 
 import db
+import tldextract
 from mitmproxy import http
+
+_EXTRACTOR = tldextract.TLDExtract(cache_dir=None)
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -61,6 +64,13 @@ def _refresh_whitelist():
         if time.monotonic() - _cache_ts > CACHE_TTL:
             _whitelist = db.get_whitelist()
             _cache_ts = time.monotonic()
+
+
+def _registered_domain(host: str) -> str:
+    """Return eTLD+1 for a host (e.g. www.google.com → google.com).
+    Falls back to the original host if extraction fails."""
+    ext = _EXTRACTOR(host)
+    return ext.registered_domain or host
 
 
 def _base_domain(host: str) -> str | None:
@@ -232,21 +242,18 @@ class KidFilter:
 
         matched = _base_domain(host)
         if matched is None:
+            log_domain = _registered_domain(host)  # bundle www.foo.com → foo.com
             mode = flow.request.headers.get("sec-fetch-mode", "navigate")
             if mode == "navigate":
-                # Top-level navigation: always queue for review.
-                db.log_blocked(host, flow.request.pretty_url)
+                db.log_blocked(log_domain, flow.request.pretty_url)
             else:
-                # Sub-resource: only queue if the referring page is already approved.
-                # Sub-resources from blocked pages don't need review (the page is blocked
-                # anyway); sub-resources from approved pages do (they can break the page).
                 referer = flow.request.headers.get("referer", "")
                 if referer:
                     try:
                         from urllib.parse import urlparse
                         ref_host = urlparse(referer).hostname or ""
                         if _base_domain(ref_host) is not None:
-                            db.log_blocked(host, flow.request.pretty_url)
+                            db.log_blocked(log_domain, flow.request.pretty_url)
                     except Exception:
                         pass
             flow.response = _make_response(BLOCKED_TMPL, host)

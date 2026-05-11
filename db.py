@@ -60,6 +60,12 @@ def init_db():
                 created_at   DATETIME DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS domain_descriptions (
+                domain      TEXT PRIMARY KEY,
+                description TEXT NOT NULL DEFAULT '',
+                fetched_at  DATETIME DEFAULT (datetime('now'))
+            );
+
             CREATE INDEX IF NOT EXISTS idx_blocked_domain ON blocked_log(domain);
             CREATE INDEX IF NOT EXISTS idx_session_domain_date ON session_log(domain, session_date);
         """)
@@ -269,19 +275,38 @@ def set_bypass(until_ts):
 
 
 def delete_domain(domain):
-    """Wipe all history for a domain: blocked log, whitelist entry, and session log."""
+    """Wipe all history for a domain: blocked log, whitelist entry, session log, and description cache."""
     with get_conn() as conn:
-        conn.execute("DELETE FROM blocked_log WHERE domain = ?", (domain,))
-        conn.execute("DELETE FROM whitelist   WHERE domain = ?", (domain,))
-        conn.execute("DELETE FROM session_log WHERE domain = ?", (domain,))
+        conn.execute("DELETE FROM blocked_log          WHERE domain = ?", (domain,))
+        conn.execute("DELETE FROM whitelist            WHERE domain = ?", (domain,))
+        conn.execute("DELETE FROM session_log          WHERE domain = ?", (domain,))
+        conn.execute("DELETE FROM domain_descriptions  WHERE domain = ?", (domain,))
+
+
+def get_cached_description(domain: str) -> str | None:
+    """Return cached description string, or None if not yet fetched."""
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT description FROM domain_descriptions WHERE domain = ?", (domain,)
+        ).fetchone()
+    return row["description"] if row is not None else None
+
+
+def cache_description(domain: str, description: str):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO domain_descriptions (domain, description) VALUES (?, ?)",
+            (domain, description),
+        )
 
 
 def clear_all():
-    """Wipe all blocked log, session history, and whitelist entries, then re-seed defaults."""
+    """Wipe all blocked log, session history, whitelist, and description cache, then re-seed defaults."""
     with get_conn() as conn:
         conn.execute("DELETE FROM blocked_log")
         conn.execute("DELETE FROM session_log")
         conn.execute("DELETE FROM whitelist")
+        conn.execute("DELETE FROM domain_descriptions")
         for domain, limit in INITIAL_WHITELIST:
             conn.execute(
                 "INSERT OR IGNORE INTO whitelist (domain, daily_limit_minutes) VALUES (?, ?)",

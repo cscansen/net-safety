@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3] - 2026-05-11
+
+### Added
+- **Wildcard domain bundling** — all subdomains are now collapsed to their registered domain (eTLD+1) before being stored in the review queue. `www.google.com`, `maps.google.com`, and `google.com` appear as a single `google.com` entry. Approving it covers the whole domain as before — only the display noise is gone. Uses `tldextract` with its bundled Public Suffix List (no network required at runtime).
+- **AI site descriptions** — outstanding domains in the review table show a 3-sentence overview fetched from the DuckDuckGo Instant Answer API (free, no key required, Wikipedia-backed). Results are cached in the DB. The page never blocks on the lookup — if no description is available the element is silently removed.
+
+---
+
 ## [0.7.2] - 2026-05-11
 
 ### Added
