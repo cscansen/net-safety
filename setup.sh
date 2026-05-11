@@ -109,18 +109,20 @@ sudo -u kidproxy /opt/kid-proxy/venv/bin/python -c "import sys; sys.path.insert(
 
 # ── 7. admin account ─────────────────────────────────────────────────────────
 echo ""
-read -rp "  Admin username [admin]: " ADMIN_USER
-ADMIN_USER="${ADMIN_USER:-admin}"
+echo "  Admin login username: admin"
+echo "  (Add more accounts after setup at http://localhost:9090/accounts)"
+echo ""
+ADMIN_USER="admin"
 while true; do
-  read -rsp "  Set password for '$ADMIN_USER': " PW1; echo
+  read -rsp "  Set password for 'admin': " PW1; echo
   [[ -n "$PW1" ]] && break
   warn "Admin password cannot be empty."
 done
 read -rsp "  Confirm password: " PW2; echo
 while [[ "$PW1" != "$PW2" ]]; do
   warn "Passwords don't match, try again."
-  read -rsp "  Set password for '$ADMIN_USER': " PW1; echo
-  read -rsp "  Confirm password:               " PW2; echo
+  read -rsp "  Set password for 'admin': " PW1; echo
+  read -rsp "  Confirm password:         " PW2; echo
 done
 
 /opt/kid-proxy/venv/bin/python -c "
