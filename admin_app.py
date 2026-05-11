@@ -159,6 +159,17 @@ def delete_domain():
     return redirect(url_for("review"))
 
 
+@app.post("/clear-all")
+def clear_all():
+    redir = _require_auth()
+    if redir:
+        return redir
+    if session.get("admin_username") != "admin":
+        return redirect(url_for("review"))
+    db.clear_all()
+    return redirect(url_for("review"))
+
+
 @app.post("/bypass")
 def bypass():
     redir = _require_auth()

@@ -3,7 +3,11 @@
 ## [0.7.2] - 2026-05-11
 
 ### Added
-- **Per-domain clear button** — each row in the review table now has a small "× clear" button that wipes all history for that domain (blocked log, whitelist entry, and session log). Useful for resetting test state or removing noise entries without touching the rest of the list.
+- **Per-domain clear button** — each row in the review table now has a small "× clear" button that wipes all history for that domain (blocked log, whitelist entry, and session log). Useful for removing noise entries without touching the rest of the list.
+- **Clear Database button** (admin account only) — wipes all blocked log, whitelist approvals, and session history in one shot, then re-seeds the default ElecFreaks entries. Shows a confirmation warning before proceeding. Only visible when signed in as the `admin` account.
+
+### Fixed
+- Per-row clear buttons were nested inside the main apply `<form>`, which is invalid HTML and caused unpredictable browser behaviour. All mini-forms are now rendered outside the main form and linked via the HTML5 `form=` attribute.
 
 ---
 

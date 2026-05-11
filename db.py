@@ -276,6 +276,19 @@ def delete_domain(domain):
         conn.execute("DELETE FROM session_log WHERE domain = ?", (domain,))
 
 
+def clear_all():
+    """Wipe all blocked log, session history, and whitelist entries, then re-seed defaults."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM blocked_log")
+        conn.execute("DELETE FROM session_log")
+        conn.execute("DELETE FROM whitelist")
+        for domain, limit in INITIAL_WHITELIST:
+            conn.execute(
+                "INSERT OR IGNORE INTO whitelist (domain, daily_limit_minutes) VALUES (?, ?)",
+                (domain, limit),
+            )
+
+
 def apply_parent_review(approved_domains_limits, approved_by=None):
     """
     approved_domains_limits: {domain: limit_minutes | None}
