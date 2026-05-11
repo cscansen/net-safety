@@ -74,7 +74,7 @@ info "Kid username '$KID_USER' saved to /etc/kid-proxy/kid-user"
 # ── 2. dependencies ──────────────────────────────────────────────────────────
 info "Installing system dependencies..."
 apt-get update -qq
-apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync avahi-daemon
+apt-get install -y python3 python3-pip python3-venv libnss3-tools openssl git rsync avahi-daemon chromium-browser
 
 info "Creating Python venv and installing packages..."
 python3 -m venv /opt/kid-proxy/venv
@@ -160,7 +160,31 @@ info "Installing CA cert into system trust store..."
 cp "$CA_CERT" /usr/local/share/ca-certificates/kid-proxy-ca.crt
 update-ca-certificates
 
-# ── 10. Firefox enterprise policy ────────────────────────────────────────────
+# ── 10b. install CA cert into Chromium NSS db for kid user ───────────────────
+info "Installing CA cert into Chromium NSS database for '$KID_USER'..."
+_KID_HOME=$(getent passwd "$KID_USER" | cut -d: -f6)
+_NSS_DB="$_KID_HOME/.pki/nssdb"
+mkdir -p "$_NSS_DB"
+certutil -N -d sql:"$_NSS_DB" --empty-password 2>/dev/null || true
+certutil -D -d sql:"$_NSS_DB" -n "kid-proxy-ca" 2>/dev/null || true
+certutil -A -d sql:"$_NSS_DB" -t "CT,," -n "kid-proxy-ca" -i "$CA_CERT"
+chown -R "$KID_USER:$KID_USER" "$_KID_HOME/.pki"
+info "Chromium will trust the proxy CA for '$KID_USER'."
+
+# ── 10c. Chromium enterprise policy ──────────────────────────────────────────
+info "Installing Chromium proxy policy..."
+mkdir -p /etc/chromium/policies/managed
+cat > /etc/chromium/policies/managed/kid-proxy.json <<'JSON'
+{
+  "ProxySettings": {
+    "ProxyMode": "fixed_servers",
+    "ProxyServer": "http://127.0.0.1:3128",
+    "ProxyBypassList": "localhost,127.0.0.1"
+  }
+}
+JSON
+
+# ── 10d. Firefox enterprise policy ───────────────────────────────────────────
 info "Installing Firefox policy..."
 mkdir -p /etc/firefox/policies
 cp "$SCRIPT_DIR/policies.json" /etc/firefox/policies/policies.json
@@ -200,28 +224,9 @@ info "Auto-update timer enabled (pulls every 15 min)."
 
 # ── 13. kid account lockdown ────────────────────────────────────────────────
 echo ""
-read -rp "  Apply lockdown to '$KID_USER'? [Y/n]: " DO_LOCKDOWN
-if [[ "${DO_LOCKDOWN,,}" != "n" ]]; then
-  echo "  Profiles: restricted (age ~6, default) | tween (age ~9, planned) | teen (age ~13, planned)"
-  read -rp "  Profile [restricted]: " LOCKDOWN_PROFILE
-  LOCKDOWN_PROFILE="${LOCKDOWN_PROFILE:-restricted}"
-  bash "$SCRIPT_DIR/kid-lockdown.sh" "$KID_USER" "$LOCKDOWN_PROFILE"
-fi
-
-# Lock down any additional accounts (e.g. siblings sharing the same machine)
-while true; do
-  echo ""
-  read -rp "  Lock down an additional account? [y/N]: " MORE_LOCKDOWN
-  [[ "${MORE_LOCKDOWN,,}" == "y" ]] || break
-  read -rp "    Username: " EXTRA_USER
-  if ! id "$EXTRA_USER" &>/dev/null; then
-    warn "User '$EXTRA_USER' not found — skipping."
-    continue
-  fi
-  read -rp "    Profile [restricted]: " EXTRA_PROFILE
-  EXTRA_PROFILE="${EXTRA_PROFILE:-restricted}"
-  bash "$SCRIPT_DIR/kid-lockdown.sh" "$EXTRA_USER" "$EXTRA_PROFILE"
-done
+warn "App lockdown (hiding system apps, Google Docs/Sheets launchers) is managed by the"
+warn "separate 'kid-lockdown' repo. After setup, run:"
+warn "  sudo bash /path/to/kid-lockdown/kid-lockdown.sh $KID_USER restricted"
 
 # ── 14. verify ───────────────────────────────────────────────────────────────
 echo ""
@@ -244,16 +249,18 @@ $ADMIN_OK && echo -e "  Admin  : ${GREEN}running${NC} (localhost:9090)" \
 $TIMER_OK && echo -e "  Updates: ${GREEN}active${NC} (weekly from GitHub)" \
            || echo -e "  Updates: ${RED}not active${NC} — check: systemctl status kid-update.timer"
 echo ""
-echo "  Firefox will trust the proxy CA via ImportEnterpriseRoots."
-echo "  Restart Firefox after first login to pick up the new policy."
+echo "  Firefox + Chromium trust the proxy CA."
+echo "  Restart both browsers after first login to pick up the new policy."
 echo ""
 echo "  Kid account       : $KID_USER"
 echo "  Parent Review URL : http://localhost:9090"
-echo "  Proxy             : 127.0.0.1:3128 (locked in Firefox policy)"
+echo "  Proxy             : 127.0.0.1:3128 (locked in Firefox + Chromium policy)"
 echo ""
-echo "  Next: configure Timekpr for '$KID_USER'"
-echo "    timekpra --setallowedweekdays $KID_USER 1,2,3,4,5,6,7"
-echo "    timekpra --settimelimits $KID_USER 120,120,120,120,120,180,180"
+echo "  Next steps:"
+echo "    1. Run kid-lockdown.sh from the 'kid-lockdown' repo to hide system apps"
+echo "       and add Google Docs/Sheets launchers."
+echo "    2. Sign into Google in Chromium as '$KID_USER' and enable offline mode"
+echo "       in Google Drive settings (once per account)."
 echo ""
-warn "If proxy service fails, Firefox cannot reach the internet (fail-closed)."
+warn "If proxy service fails, Firefox + Chromium cannot reach the internet (fail-closed)."
 echo "══════════════════════════════════════════"

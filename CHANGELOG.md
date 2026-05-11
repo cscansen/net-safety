@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.8.0] - 2026-05-11
+
+### Added
+- **Chromium support** — `chromium-browser` added to setup dependencies. Proxy CA cert is now installed into the kid user's Chromium NSS database via `certutil` so Chromium trusts mitmproxy-intercepted HTTPS the same as Firefox.
+- **Chromium enterprise policy** — `/etc/chromium/policies/managed/kid-proxy.json` locks Chromium's proxy to `127.0.0.1:3128` with the same fail-closed guarantee as the Firefox enterprise policy.
+
+### Changed
+- **kid-lockdown.sh moved** — app-hiding and Google Docs/Sheets launcher setup are now managed by the standalone `kid-lockdown` repo. `setup.sh` no longer calls `kid-lockdown.sh` directly; the summary now prints the command to run it separately.
+
+---
+
 ## [0.7.3] - 2026-05-11
 
 ### Added
