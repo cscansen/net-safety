@@ -189,6 +189,10 @@ chmod +x /usr/local/bin/kid-proxy-update
 systemctl enable --now kid-update.timer
 info "Auto-update timer enabled (pulls every 15 min)."
 
+# ── 13. kid account lockdown ────────────────────────────────────────────────
+info "Applying kid account lockdown (hiding admin tools, enabling auto-updates)..."
+bash "$SCRIPT_DIR/kid-lockdown.sh" "$KID_USER"
+
 # ── 14. verify ───────────────────────────────────────────────────────────────
 echo ""
 info "Waiting for services to start..."
