@@ -1,0 +1,17 @@
+[Unit]
+Description=Kid Parental Control Admin UI
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=kidproxy
+EnvironmentFile=/etc/kid-proxy/env
+ExecStart=/usr/bin/python3 /opt/kid-proxy/admin_app.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

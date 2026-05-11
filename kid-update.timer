@@ -1,0 +1,11 @@
+[Unit]
+Description=net-safety auto-update timer
+Requires=network-online.target
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

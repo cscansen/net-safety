@@ -1,0 +1,10 @@
+[Unit]
+Description=net-safety auto-update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kid-proxy-update
+StandardOutput=journal
+StandardError=journal

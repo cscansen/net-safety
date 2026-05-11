@@ -1,0 +1,34 @@
+{
+  "policies": {
+    "BlockAboutConfig": true,
+    "BlockAboutAddons": true,
+    "DisablePrivateBrowsing": true,
+    "DisableDeveloperTools": true,
+    "Certificates": {
+      "ImportEnterpriseRoots": true
+    },
+    "Proxy": {
+      "Mode": "manual",
+      "HTTPProxy": "127.0.0.1:3128",
+      "UseHTTPProxyForAllProtocols": true,
+      "Passthrough": "localhost,127.0.0.1",
+      "Locked": true
+    },
+    "Homepage": {
+      "URL": "http://localhost:8080",
+      "Locked": true
+    },
+    "Bookmarks": [
+      {
+        "Title": "Cutebot Instructions",
+        "URL": "https://wiki.elecfreaks.com/en/microbit/microbit-smart-cutebot-kit/",
+        "Placement": "toolbar"
+      },
+      {
+        "Title": "🔒 Parent Review",
+        "URL": "http://localhost:9090",
+        "Placement": "toolbar"
+      }
+    ]
+  }
+}
