@@ -37,8 +37,8 @@ _cache_lock = threading.Lock()
 _bypass_cache: tuple[float, float | None] = (0, None)
 _bypass_lock = threading.Lock()
 
-# {domain: (session_start, last_seen)}
-_sessions: dict[str, tuple[float, float]] = {}
+# {domain: (session_start, last_seen, session_date)}
+_sessions: dict[str, tuple[float, float, str]] = {}
 _sessions_lock = threading.Lock()
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -85,8 +85,8 @@ def _flush_session(domain: str):
     with _sessions_lock:
         if domain not in _sessions:
             return
-        start, last = _sessions.pop(domain)
-    db.log_session(domain, last - start)
+        start, last, session_date = _sessions.pop(domain)
+    db.log_session(domain, last - start, session_date)
 
 
 def _record_activity(domain: str) -> tuple[float, float]:
@@ -94,17 +94,23 @@ def _record_activity(domain: str) -> tuple[float, float]:
     Record activity and return (today_seconds_used, this_week_seconds_used).
     Both include the current in-memory session.
     """
+    from datetime import date as _date
+    today = _date.today().isoformat()
     now = time.monotonic()
     with _sessions_lock:
         if domain in _sessions:
-            start, last = _sessions[domain]
-            if now - last > IDLE_TIMEOUT:
-                _sessions[domain] = (now, now)
-                db.log_session(domain, last - start)
+            start, last, session_date = _sessions[domain]
+            if session_date != today:
+                # Midnight crossed — commit yesterday's session with the correct date.
+                db.log_session(domain, last - start, session_date)
+                _sessions[domain] = (now, now, today)
+            elif now - last > IDLE_TIMEOUT:
+                db.log_session(domain, last - start, session_date)
+                _sessions[domain] = (now, now, today)
             else:
-                _sessions[domain] = (start, now)
+                _sessions[domain] = (start, now, session_date)
         else:
-            _sessions[domain] = (now, now)
+            _sessions[domain] = (now, now, today)
         session_seconds = _sessions[domain][1] - _sessions[domain][0]
 
     today_db  = db.get_today_db_seconds(domain)
@@ -299,8 +305,8 @@ class KidFilter:
         with _sessions_lock:
             items = list(_sessions.items())
             _sessions.clear()
-        for domain, (start, last) in items:
-            db.log_session(domain, last - start)
+        for domain, (start, last, session_date) in items:
+            db.log_session(domain, last - start, session_date)
 
 
 addons = [KidFilter()]

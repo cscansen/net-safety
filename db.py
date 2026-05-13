@@ -105,14 +105,15 @@ def log_blocked(domain, url):
         )
 
 
-def log_session(domain, duration_seconds):
+def log_session(domain, duration_seconds, session_date=None):
     if duration_seconds < 5:
         return
-    today = date.today().isoformat()
+    if session_date is None:
+        session_date = date.today().isoformat()
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO session_log (domain, session_date, duration_seconds) VALUES (?, ?, ?)",
-            (domain, today, duration_seconds),
+            (domain, session_date, duration_seconds),
         )
 
 

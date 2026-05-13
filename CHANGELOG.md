@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.4] - 2026-05-13
+
+### Fixed
+- **Midnight rollover** — daily time budgets now reset correctly at midnight without requiring a proxy restart. Session tracking stores the session date; if a domain is still active when the day changes, the previous day's time is flushed to the DB with the correct date and a fresh session begins for the new day.
+
+---
+
 ## [0.8.3] - 2026-05-13
 
 ### Fixed
