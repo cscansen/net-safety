@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3] - 2026-05-13
+
+### Fixed
+- **Session persistence across restarts** — proxy now flushes all in-memory session time to the DB on shutdown via the mitmproxy `done` hook. Previously, any time the kid had spent on a timed site since the last idle timeout was silently discarded on proxy restart, resetting the daily counter.
+
+---
+
 ## [0.8.2] - 2026-05-13
 
 ### Added

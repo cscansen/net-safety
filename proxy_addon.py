@@ -294,5 +294,13 @@ class KidFilter:
         except Exception:
             pass
 
+    def done(self):
+        # Flush all in-memory sessions to DB on shutdown so time isn't lost across restarts.
+        with _sessions_lock:
+            items = list(_sessions.items())
+            _sessions.clear()
+        for domain, (start, last) in items:
+            db.log_session(domain, last - start)
+
 
 addons = [KidFilter()]
