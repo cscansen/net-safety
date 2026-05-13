@@ -300,6 +300,15 @@ def cache_description(domain: str, description: str):
         )
 
 
+def extend_daily_limit(domain: str, minutes: int):
+    """Add minutes to a domain's daily limit (creates one if none was set)."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE whitelist SET daily_limit_minutes = COALESCE(daily_limit_minutes, 0) + ? WHERE domain = ?",
+            (minutes, domain),
+        )
+
+
 def clear_all():
     """Wipe all blocked log, session history, whitelist, and description cache, then re-seed defaults."""
     with get_conn() as conn:

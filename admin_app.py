@@ -120,7 +120,11 @@ def review():
         bypass_active = True
         bypass_remaining = int(bypass_until - now)
 
-    return render_template("review.html", domains=domains,
+    timed = [d for d in domains
+             if d["approved"] and d["daily_limit"] is not None
+             and d["used_today"] >= d["daily_limit"]]
+
+    return render_template("review.html", domains=domains, timed=timed,
                            bypass_active=bypass_active,
                            bypass_remaining=bypass_remaining,
                            current_user=session["admin_username"])
@@ -149,6 +153,21 @@ def apply():
         approved[domain] = (daily, weekly)
 
     db.apply_parent_review(approved, approved_by=session["admin_username"])
+    return redirect(url_for("review"))
+
+
+@app.post("/extend")
+def extend():
+    redir = _require_auth()
+    if redir:
+        return redir
+    domain = request.form.get("domain", "").strip()
+    try:
+        minutes = int(request.form.get("minutes", 0))
+    except (ValueError, TypeError):
+        minutes = 0
+    if domain and minutes in (15, 30):
+        db.extend_daily_limit(domain, minutes)
     return redirect(url_for("review"))
 
 

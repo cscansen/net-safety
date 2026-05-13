@@ -203,6 +203,21 @@
   }
   .btn-clear:hover { background: #fde8e8; border-color: #e57373; color: #c0392b; }
 
+  /* ── timed-out section ── */
+  .tab-timed.active { background: #e67e22; border-color: #e67e22; }
+  .timed-row { display:flex; align-items:center; justify-content:space-between; padding:14px 4px; gap:16px; flex-wrap:wrap; }
+  .timed-info { flex:1; min-width:0; }
+  .timed-usage { font-size:13px; color:#888; margin-top:3px; }
+  .timed-btns { display:flex; gap:8px; flex-shrink:0; }
+  .btn-extend { padding:8px 16px; border-radius:8px; border:none; background:#1a73e8; color:#fff;
+                font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .btn-extend:hover { background:#155db2; }
+  .timed-divider { border:none; border-top:1px solid #eee; margin:0; }
+  @media (prefers-color-scheme:dark) {
+    .tab-timed.active { background:#c0621a; border-color:#c0621a; }
+    .timed-divider { border-color:#2a2d3e; }
+  }
+
   /* ── mobile table scroll ── */
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   @media (max-width: 600px) {
@@ -333,6 +348,9 @@
   <button class="tab" onclick="filterDomains('denied', this)">
     Denied <span class="count" id="cnt-denied">0</span>
   </button>
+  <button class="tab tab-timed" onclick="filterDomains('timed', this)">
+    Timed Out <span class="count" id="cnt-timed">{{ timed|length }}</span>
+  </button>
 </div>
 
 <form method="post" action="/apply">
@@ -455,6 +473,40 @@
 {% endfor %}
 <form id="clear-all-form" method="post" action="/clear-all" style="display:none"></form>
 
+<!-- Timed-out section (shown only when Timed Out tab is active) -->
+<div id="timed-section" style="display:none; margin-top:8px;">
+  <div class="card">
+    {% if timed %}
+    {% for d in timed %}
+    <div class="timed-row">
+      <div class="timed-info">
+        <div class="domain-name">{{ d.domain }}</div>
+        <div class="timed-usage">Used {{ d.used_today }}m of {{ d.daily_limit }}m today</div>
+      </div>
+      <div class="timed-btns">
+        <form method="post" action="/extend" style="display:inline">
+          <input type="hidden" name="domain" value="{{ d.domain }}">
+          <input type="hidden" name="minutes" value="15">
+          <button type="submit" class="btn-extend">+15 min</button>
+        </form>
+        <form method="post" action="/extend" style="display:inline">
+          <input type="hidden" name="domain" value="{{ d.domain }}">
+          <input type="hidden" name="minutes" value="30">
+          <button type="submit" class="btn-extend">+30 min</button>
+        </form>
+      </div>
+    </div>
+    {% if not loop.last %}<hr class="timed-divider">{% endif %}
+    {% endfor %}
+    {% else %}
+    <div class="empty">
+      <div class="big">⏳</div>
+      <p>No sites have hit their time limit today.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
 <script>
 function toggleLimit(checkbox, idx) {
   const disabled = !checkbox.checked;
@@ -467,10 +519,19 @@ function toggleLimit(checkbox, idx) {
 function filterDomains(filter, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.querySelectorAll('tbody tr').forEach(row => {
-    const s = row.dataset.status;
-    row.style.display = (filter === 'all' || s === filter) ? '' : 'none';
-  });
+  const timedSection = document.getElementById('timed-section');
+  const mainForm = document.querySelector('form[action="/apply"]');
+  if (filter === 'timed') {
+    if (timedSection) timedSection.style.display = '';
+    if (mainForm) mainForm.style.display = 'none';
+  } else {
+    if (timedSection) timedSection.style.display = 'none';
+    if (mainForm) mainForm.style.display = '';
+    document.querySelectorAll('tbody tr').forEach(row => {
+      const s = row.dataset.status;
+      row.style.display = (filter === 'all' || s === filter) ? '' : 'none';
+    });
+  }
 }
 
 (function fetchDescriptions() {

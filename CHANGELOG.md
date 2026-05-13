@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.2] - 2026-05-13
+
+### Added
+- **Timed Out tab** — new orange tab in the admin review page lists every domain that has hit its daily limit. Shows time used vs. limit for each.
+- **Quick extend buttons** — +15 min and +30 min buttons per domain on the Timed Out tab. Each press adds to the daily limit so the kid can continue immediately without going through the full review flow.
+
+---
+
 ## [0.8.1] - 2026-05-13
 
 ### Changed
