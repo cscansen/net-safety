@@ -260,6 +260,11 @@ class KidFilter:
                 flow.response = _make_response(TIMEOUT_TMPL, host)
                 return
 
+    def responseheaders(self, flow: http.HTTPFlow):
+        ct = flow.response.headers.get("content-type", "")
+        if "text/html" not in ct:
+            flow.response.stream = True
+
     def response(self, flow: http.HTTPFlow):
         if _check_bypass():
             return

@@ -4,6 +4,7 @@
 
 ### Changed
 - **Navigation-only blocking** — only top-level page navigations (`Sec-Fetch-Mode: navigate`) are blocked and queued for review. Sub-resources (scripts, images, XHR, CDN calls, etc.) pass through silently — they are never blocked and never appear in the review queue. This means the review queue shows only sites the kid actually tried to visit.
+- **Response streaming** — non-HTML responses (video, audio, images, JS, etc.) are now streamed through mitmproxy without buffering. Fixes video playback on YouTube and other media sites that previously timed out while mitmproxy tried to buffer the full response body.
 
 ---
 
