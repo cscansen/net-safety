@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1] - 2026-05-13
+
+### Changed
+- **Navigation-only blocking** — only top-level page navigations (`Sec-Fetch-Mode: navigate`) are blocked and queued for review. Sub-resources (scripts, images, XHR, CDN calls, etc.) pass through silently — they are never blocked and never appear in the review queue. This means the review queue shows only sites the kid actually tried to visit.
+
+---
+
 ## [0.8.0] - 2026-05-11
 
 ### Added

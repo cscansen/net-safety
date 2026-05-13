@@ -246,18 +246,9 @@ class KidFilter:
             mode = flow.request.headers.get("sec-fetch-mode", "navigate")
             if mode == "navigate":
                 db.log_blocked(log_domain, flow.request.pretty_url)
-            else:
-                referer = flow.request.headers.get("referer", "")
-                if referer:
-                    try:
-                        from urllib.parse import urlparse
-                        ref_host = urlparse(referer).hostname or ""
-                        if _base_domain(ref_host) is not None:
-                            db.log_blocked(log_domain, flow.request.pretty_url)
-                    except Exception:
-                        pass
-            flow.response = _make_response(BLOCKED_TMPL, host)
-            return
+                flow.response = _make_response(BLOCKED_TMPL, host)
+                return
+            # Sub-resource — pass through silently, never queue for review.
 
         daily_limit, weekly_limit = _whitelist.get(matched, (None, None))
         if daily_limit is not None or weekly_limit is not None:
