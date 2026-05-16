@@ -2,7 +2,7 @@
 
 Kid-safe web proxy and parental control system for Linux. Designed for a household where a young child has their own desktop — filtering runs transparently in the background, and parents manage it from any device on the home network.
 
-**Current version:** 0.8.0
+**Current version:** 0.8.6
 
 ---
 
@@ -33,6 +33,7 @@ Browser → mitmproxy (127.0.0.1:3128) → internet
 - Multi-admin accounts with audit trail (who approved what and when)
 - AI-generated site descriptions (DuckDuckGo/Wikipedia, cached, non-blocking)
 - Subdomain bundling — `www.google.com` and `maps.google.com` both queue as `google.com`
+- Admin-seeded always-allowed domains shown in the Approved tab (read-only, distinct badge)
 - LAN-accessible admin UI with mDNS (`http://<hostname>.local:9090`)
 - Dark mode (follows OS preference)
 - Weekly auto-update from GitHub, daily OS auto-updates

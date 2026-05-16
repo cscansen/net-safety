@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.8.6] - 2026-05-16
+
+### Added
+- **Admin-seeded domain display** — always-allowed domains (ElecFreaks, microbit.org, MakeCode) now appear in the Approved tab with an "Administratively allowed" badge. Previously they were invisible in the UI since they never pass through the review queue. The Allow checkbox is replaced with a lock icon and the row is read-only — time limit inputs and the clear button are disabled.
+- **MakeCode allowlist** — `makecode.com` (main editor) and `pxt.azureedge.net` (MakeCode CDN/static assets) added to the default approved list with no time limit. `microbit.org` already covered `makecode.microbit.org`. Existing installs get both entries automatically on next restart.
+- **Filter tab empty state** — switching to Outstanding, Approved, or Denied when no rows match now shows a friendly message instead of column headers over an empty table.
+
+---
+
 ## [0.8.5] - 2026-05-16
 
 ### Added
