@@ -7,6 +7,7 @@ DB_PATH = "/var/lib/kid-proxy/db.sqlite"
 INITIAL_WHITELIST = [
     ("wiki.elecfreaks.com", None),   # None = no time limit
     ("shop.elecfreaks.com", None),
+    ("microbit.org", None),          # MakeCode + all microbit.org subdomains
 ]
 
 DEFAULT_LIMIT_MINUTES = 30

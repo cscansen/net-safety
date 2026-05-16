@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.5] - 2026-05-16
+
+### Added
+- **MakeCode allowlist** — `microbit.org` (covers `makecode.microbit.org` and all subdomains) added to the default approved list with no time limit. Existing installs get it automatically via the update script's DB upsert on next pull.
+
+---
+
 ## [0.8.4] - 2026-05-13
 
 ### Fixed

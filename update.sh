@@ -36,5 +36,11 @@ rsync -a --delete \
     "$REPO_DIR/" "$DEPLOY_DIR/"
 
 chown -R kidproxy:kidproxy "$DEPLOY_DIR"
+
+# Ensure always-allowed domains exist in the DB (idempotent upsert).
+sqlite3 /var/lib/kid-proxy/db.sqlite \
+    "INSERT OR IGNORE INTO whitelist (domain, daily_limit_minutes, weekly_limit_minutes, approved_by, active)
+     VALUES ('microbit.org', NULL, NULL, 'system', 1);"
+
 systemctl restart kid-proxy kid-admin
 log "Redeployed successfully"
