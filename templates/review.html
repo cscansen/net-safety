@@ -80,6 +80,7 @@
   }
   .badge-blocked  { background: #fde8e8; color: #c0392b; }
   .badge-approved { background: #e6f4ea; color: #1e8e3e; }
+  .badge-admin    { background: #e8eaf6; color: #3949ab; }
 
   /* checkbox */
   .check-cell { text-align: center; }
@@ -141,6 +142,7 @@
     .domain-meta, .limit-label, .used-note { color: #9e9eb0 !important; }
     .badge-blocked  { background: #3a1a1a; color: #e57373; }
     .badge-approved { background: #152a1e; color: #4caf75; }
+    .badge-admin    { background: #1a1d3a; color: #7986cb; }
     .limit-input {
       background: #0f1117; border-color: #3a3d52; color: #e8eaf6;
     }
@@ -375,15 +377,21 @@
           <td>
             <div class="domain-name">{{ d.domain }}</div>
             <div class="domain-meta">
-              <span class="badge {% if d.approved %}badge-approved{% else %}badge-blocked{% endif %}">
-                {% if d.approved %}Approved{% else %}Blocked{% endif %}
-              </span>
+              {% if d.is_admin %}
+              <span class="badge badge-admin">Administratively allowed</span>
+              {% elif d.approved %}
+              <span class="badge badge-approved">Approved</span>
+              {% else %}
+              <span class="badge badge-blocked">Blocked</span>
+              {% endif %}
             </div>
             {% if not d.approved and not d.denied %}
             <div class="domain-desc loading" data-domain="{{ d.domain }}">Looking up…</div>
             {% endif %}
+            {% if not d.is_admin %}
             <button type="submit" form="del_{{ loop.index }}" class="btn-clear"
                     onclick="return confirm('Remove {{ d.domain }} from history?')">× clear</button>
+            {% endif %}
           </td>
 
           <!-- Attempts -->
@@ -402,12 +410,16 @@
 
           <!-- Checkbox -->
           <td class="check-cell">
+            {% if d.is_admin %}
+            <span title="Always allowed" style="font-size:18px">🔒</span>
+            {% else %}
             <input type="checkbox"
                    name="allow_{{ d.domain }}"
                    id="chk_{{ loop.index }}"
                    value="{{ d.domain }}"
                    {% if d.approved %}checked{% endif %}
                    onchange="toggleLimit(this, {{ loop.index }})">
+            {% endif %}
           </td>
 
           <!-- Time limits -->
@@ -418,7 +430,7 @@
                      name="daily_{{ d.domain }}"
                      value="{{ d.daily_limit if d.daily_limit is not none else 30 }}"
                      min="1" max="1440"
-                     {% if not d.approved %}disabled{% endif %}>
+                     {% if not d.approved or d.is_admin %}disabled{% endif %}>
               <span class="limit-label">min/day</span>
             </div>
             <div class="limit-wrap">
@@ -428,7 +440,7 @@
                      value="{{ d.weekly_limit if d.weekly_limit is not none else '' }}"
                      placeholder="—"
                      min="1" max="10080"
-                     {% if not d.approved %}disabled{% endif %}>
+                     {% if not d.approved or d.is_admin %}disabled{% endif %}>
               <span class="limit-label">min/week</span>
             </div>
             {% if d.approved %}
@@ -440,13 +452,21 @@
           </td>
         </tr>
         {% endfor %}
+        <tr id="empty-filter-row" style="display:none">
+          <td colspan="6">
+            <div class="empty">
+              <div class="big">✅</div>
+              <p>Nothing here yet — they'll appear when the kids try to visit something new.</p>
+            </div>
+          </td>
+        </tr>
       </tbody>
     </table>
     </div>
     {% else %}
     <div class="empty">
       <div class="big">✅</div>
-      <p>No blocked sites yet. They'll appear here when the kid tries to visit something.</p>
+      <p>Nothing here yet — they'll appear when the kids try to visit something new.</p>
     </div>
     {% endif %}
   </div>
@@ -527,10 +547,15 @@ function filterDomains(filter, btn) {
   } else {
     if (timedSection) timedSection.style.display = 'none';
     if (mainForm) mainForm.style.display = '';
-    document.querySelectorAll('tbody tr').forEach(row => {
+    let visible = 0;
+    document.querySelectorAll('tbody tr[data-status]').forEach(row => {
       const s = row.dataset.status;
-      row.style.display = (filter === 'all' || s === filter) ? '' : 'none';
+      const show = filter === 'all' || s === filter;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
     });
+    const emptyRow = document.getElementById('empty-filter-row');
+    if (emptyRow) emptyRow.style.display = visible === 0 ? '' : 'none';
   }
 }
 

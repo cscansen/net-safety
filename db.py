@@ -7,7 +7,9 @@ DB_PATH = "/var/lib/kid-proxy/db.sqlite"
 INITIAL_WHITELIST = [
     ("wiki.elecfreaks.com", None),   # None = no time limit
     ("shop.elecfreaks.com", None),
-    ("microbit.org", None),          # MakeCode + all microbit.org subdomains
+    ("microbit.org", None),          # covers makecode.microbit.org + all microbit.org subdomains
+    ("makecode.com", None),          # Microsoft MakeCode editor
+    ("pxt.azureedge.net", None),     # MakeCode CDN / static assets
 ]
 
 DEFAULT_LIMIT_MINUTES = 30
@@ -283,6 +285,26 @@ def delete_domain(domain):
         conn.execute("DELETE FROM whitelist            WHERE domain = ?", (domain,))
         conn.execute("DELETE FROM session_log          WHERE domain = ?", (domain,))
         conn.execute("DELETE FROM domain_descriptions  WHERE domain = ?", (domain,))
+
+
+def get_admin_only_domains():
+    """Active whitelist entries that have never appeared in blocked_log (admin-seeded)."""
+    today = date.today().isoformat()
+    week_start = get_week_start()
+    with get_conn() as conn:
+        return conn.execute("""
+            SELECT w.domain, w.daily_limit_minutes, w.weekly_limit_minutes,
+                   COALESCE(SUM(CASE WHEN sl.session_date = :today
+                                THEN sl.duration_seconds END), 0) / 60.0 AS minutes_used_today,
+                   COALESCE(SUM(CASE WHEN sl.session_date >= :week_start
+                                THEN sl.duration_seconds END), 0) / 60.0 AS minutes_used_week
+            FROM whitelist w
+            LEFT JOIN session_log sl ON sl.domain = w.domain
+            WHERE w.active = 1
+              AND w.domain NOT IN (SELECT DISTINCT domain FROM blocked_log)
+            GROUP BY w.domain
+            ORDER BY w.domain
+        """, {"today": today, "week_start": week_start}).fetchall()
 
 
 def get_cached_description(domain: str) -> str | None:

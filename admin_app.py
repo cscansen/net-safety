@@ -106,6 +106,23 @@ def review():
             "used_week":           round(r["minutes_used_week"], 1),
             "approved_by":         r["approved_by"] or "—",
             "approved_at":         _fmt_age(r["approved_at"]),
+            "is_admin":            False,
+        })
+
+    for r in db.get_admin_only_domains():
+        domains.append({
+            "domain":    r["domain"],
+            "attempts":  0,
+            "last_seen": "—",
+            "approved":  True,
+            "denied":    False,
+            "daily_limit":  r["daily_limit_minutes"],
+            "weekly_limit": r["weekly_limit_minutes"],
+            "used_today":   round(r["minutes_used_today"], 1),
+            "used_week":    round(r["minutes_used_week"], 1),
+            "approved_by":  "—",
+            "approved_at":  "—",
+            "is_admin":     True,
         })
 
     bypass_until = db.get_bypass_until()
