@@ -22,7 +22,6 @@ import db
 
 app = Flask(__name__, template_folder="/opt/kid-proxy/templates")
 app.secret_key = os.environ["FLASK_SECRET"]
-ADMIN_HOSTNAME = os.environ.get("ADMIN_HOSTNAME", "localhost")
 app.config["SESSION_COOKIE_SAMESITE"] = "Strict"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(hours=2)
@@ -146,7 +145,7 @@ def review():
                            bypass_active=bypass_active,
                            bypass_remaining=bypass_remaining,
                            current_user=session["admin_username"],
-                           admin_hostname=ADMIN_HOSTNAME)
+                           admin_hostname=request.host.split(":")[0])
 
 
 @app.post("/apply")
