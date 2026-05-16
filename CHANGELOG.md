@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.7] - 2026-05-16
+
+### Added
+- **Parent URL on block page** — the block and time's-up pages now show `http://<hostname>:9090` below the Parent Review button so parents on another device know where to go without guessing.
+- **Admin hostname in header** — the mDNS address is displayed in the top-right of the admin review page as a persistent reminder for bookmarking or sharing with co-parents.
+
+### Changed
+- **Hostname is now configurable** — `setup.sh` writes `ADMIN_HOSTNAME=$(hostname).local` to `/etc/kid-proxy/env` at install time. Both services read it on startup, so the correct address appears on any machine without hardcoding.
+
+### Fixed
+- Removed stale comment in `update.sh` referencing a deploy key that was removed when the repo switched to HTTPS in v0.4.
+
+---
+
 ## [0.8.6] - 2026-05-16
 
 ### Added
