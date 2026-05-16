@@ -7,6 +7,7 @@ a "Time's Up" page when the budget is exhausted.  HTML responses for timed
 domains get a floating countdown widget injected.
 """
 
+import os
 import sys
 import time
 import threading
@@ -22,7 +23,8 @@ _EXTRACTOR = tldextract.TLDExtract(cache_dir=None)
 # ── constants ────────────────────────────────────────────────────────────────
 
 ADMIN_URL     = "http://localhost:9090"
-ADMIN_LAN_URL = "http://ohmanddev.local:9090"
+_hostname     = os.environ.get("ADMIN_HOSTNAME", "localhost")
+ADMIN_LAN_URL = f"http://{_hostname}:9090"
 ALWAYS_ALLOWED_HOSTS = {"localhost", "127.0.0.1"}
 CACHE_TTL = 5        # seconds between whitelist DB reads
 IDLE_TIMEOUT = 60    # seconds of inactivity before session is considered ended

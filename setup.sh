@@ -146,6 +146,7 @@ info "Admin account '$ADMIN_USER' created."
 FLASK_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 cat > /etc/kid-proxy/env <<EOF
 FLASK_SECRET=${FLASK_SECRET}
+ADMIN_HOSTNAME=$(hostname).local
 EOF
 
 chmod 600 /etc/kid-proxy/admin.hash /etc/kid-proxy/env
