@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pulls latest net-safety from GitHub and redeploys if anything changed.
-# Runs as root via systemd timer. Requires deploy key at /etc/kid-proxy/deploy_key.
+# Runs as root via systemd timer.
 set -euo pipefail
 
 REPO_DIR="/opt/net-safety-src"
