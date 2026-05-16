@@ -21,7 +21,8 @@ _EXTRACTOR = tldextract.TLDExtract(cache_dir=None)
 
 # ── constants ────────────────────────────────────────────────────────────────
 
-ADMIN_URL = "http://localhost:9090"
+ADMIN_URL     = "http://localhost:9090"
+ADMIN_LAN_URL = "http://ohmanddev.local:9090"
 ALWAYS_ALLOWED_HOSTS = {"localhost", "127.0.0.1"}
 CACHE_TTL = 5        # seconds between whitelist DB reads
 IDLE_TIMEOUT = 60    # seconds of inactivity before session is considered ended
@@ -142,7 +143,13 @@ def _seconds_remaining(domain: str) -> int | None:
 # ── block pages ──────────────────────────────────────────────────────────────
 
 def _page(title: str, icon: str, heading: str, body: str, button: bool = True) -> str:
-    btn = f'<a class="btn" href="{ADMIN_URL}">🔒 Parent Review</a>' if button else ""
+    if button:
+        btn = (
+            f'<a class="btn" href="{ADMIN_URL}">🔒 Parent Review</a>'
+            f'<p class="lan">Parents on another device: <a href="{ADMIN_LAN_URL}">{ADMIN_LAN_URL}</a></p>'
+        )
+    else:
+        btn = ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -165,6 +172,8 @@ def _page(title: str, icon: str, heading: str, body: str, button: bool = True) -
   .btn{{display:inline-block;background:#1a73e8;color:#fff;text-decoration:none;
         padding:12px 28px;border-radius:10px;font-size:15px;font-weight:600}}
   .btn:hover{{background:#155db2}}
+  .lan{{margin-top:16px;font-size:12px;color:#aaa}}
+  .lan a{{color:#aaa}}
 </style>
 </head>
 <body>
